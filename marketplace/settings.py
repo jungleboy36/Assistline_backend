@@ -26,6 +26,7 @@ SECRET_KEY = 'django-insecure-ku*hf!uua5+i99m7w()f&kwgsdpm0cm#yt&5*0&-nb%t+^xv(g
 DEBUG = True
 
 ALLOWED_HOSTS = []
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Application definition
@@ -38,7 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
-    'rest_framework'
+    'rest_framework',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'marketplace.urls'
@@ -129,3 +132,9 @@ from firebase_admin import credentials
 
 cred = credentials.Certificate("marketplace\marketplace.json")
 firebase_admin.initialize_app(cred)
+
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:4200',  # Add the origin of your Angular application
+    # Add other allowed origins as needed
+]

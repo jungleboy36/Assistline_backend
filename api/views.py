@@ -4,24 +4,29 @@ from rest_framework import status
 from rest_framework import viewsets
 from .serializers import OffresSerializer
 from firebase_admin import firestore
+from django.utils import timezone
 
 class OffresViewSet(viewsets.ViewSet):
     serializer_class = OffresSerializer
-
     def list(self, request):
         offres = firestore.client().collection('offres').get()
-        data = [doc.to_dict() for doc in offres]
+        data = [{'id': doc.id, **doc.to_dict()} for doc in offres]  # Add 'id' field with document ID
+        #print("****list data :",data)
         return Response(data)
 
-    def create(self, request):
+    def create(self, request): 
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
-            id_value = data.pop("id")
+            i = firestore.client().collection('id').document('number').get().to_dict().get('id')
+            #print("***** i : ", i)
+            id_value =i
+            firestore.client().collection('id').document('number').set({'id':i+1})
+            data['creationDate'] = timezone.now()
             firestore.client().collection('offres').document(str(id_value)).set(data)
             return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+ 
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('offres').document(pk).get()
         if offre.exists:
@@ -33,6 +38,7 @@ class OffresViewSet(viewsets.ViewSet):
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
+            data['updateDate'] = timezone.now()
             firestore.client().collection('offres').document(pk).set(data,merge= True)
             return Response(data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

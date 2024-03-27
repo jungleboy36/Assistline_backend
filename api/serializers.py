@@ -6,7 +6,7 @@ class OffresSerializer(serializers.HyperlinkedModelSerializer):
     # specify model and fields
     class Meta:
         model = Offre
-        fields = ('id','title', 'description')
+        fields = ('title', 'description','creationDate','updateDate')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
