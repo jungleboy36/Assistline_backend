@@ -11,6 +11,8 @@ router = routers.DefaultRouter()
 
 # define the router path and viewset to be used
 router.register(r'offres', OffresViewSet, basename='offres')
+router.register(r'demandes', DemandesViewSet, basename='demandes')
+router.register(r'register',RegisterViewSet,basename='register')
 
 # specify URL Path for rest_framework
 urlpatterns = [

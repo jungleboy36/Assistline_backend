@@ -1,4 +1,4 @@
-from .models import Offre
+from .models import *
 from rest_framework import serializers
 
 # Create a model serializer
@@ -7,6 +7,26 @@ class OffresSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Offre
         fields = ('title', 'description','creationDate','updateDate')
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set partial=True to allow partial updates
+        self.partial = True
+
+class DemandesSerializer(serializers.HyperlinkedModelSerializer):
+    # specify model and fields
+    class Meta:
+        model = Demande
+        fields = ('title', 'description','creationDate','updateDate')
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set partial=True to allow partial updates
+        self.partial = True
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'name', 'email', 'password','role', 'phone', 'dateInscription', 'bio','city','file')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
