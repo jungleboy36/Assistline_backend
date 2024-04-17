@@ -28,6 +28,6 @@ class User(models.Model):
     dateInscription = models.DateTimeField(auto_now_add=True)
     bio = models.TextField(null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
-
+    image = models.ImageField(blank=True)
     # Additional fields based on role
     file = models.FileField(upload_to='uploaded_files/', blank=True, null=True)  # Only for companies

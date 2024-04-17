@@ -31,3 +31,7 @@ class UserSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
         self.partial = True
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()

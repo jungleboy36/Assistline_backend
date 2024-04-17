@@ -14,8 +14,11 @@ router.register(r'offres', OffresViewSet, basename='offres')
 router.register(r'demandes', DemandesViewSet, basename='demandes')
 router.register(r'register',RegisterViewSet,basename='register')
 
+
 # specify URL Path for rest_framework
 urlpatterns = [
+	path('login/', LoginAPIView.as_view(), name='login'),
+	path('profile/', ProfileView.as_view(), name='user_profile'),
 	path('', include(router.urls)),
 	path('api-auth/', include('rest_framework.urls'))
 ]
