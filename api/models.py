@@ -23,11 +23,11 @@ class User(models.Model):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=50)
+    enabled = models.BooleanField(default=True)
     role = models.CharField(max_length=20)
     phone = models.IntegerField(null=True, blank=True)
     dateInscription = models.DateTimeField(auto_now_add=True)
     bio = models.TextField(null=True, blank=True)
     city = models.CharField(max_length=100, blank=True)
-    image = models.ImageField(blank=True)
-    # Additional fields based on role
-    file = models.FileField(upload_to='uploaded_files/', blank=True, null=True)  # Only for companies
+    image = models.TextField(blank=True)
+    file = models.TextField(blank=True, null=True)  # Only for companies

@@ -41,17 +41,18 @@ INSTALLED_APPS = [
     'api',
     'rest_framework',
     'corsheaders',
+    'rest_framework_jwt',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'marketplace.urls'
@@ -135,6 +136,10 @@ firebase_admin.initialize_app(cred)
 
 
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:4200',  # Add the origin of your Angular application
+    'http://localhost:4200',
+      # Add the origin of your Angular application
     # Add other allowed origins as needed
 ]
+CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies' ]
+
+ 

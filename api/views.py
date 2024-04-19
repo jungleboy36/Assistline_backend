@@ -12,8 +12,8 @@ from django.shortcuts import get_object_or_404
 import base64
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
-
-
+from rest_framework.decorators import api_view
+from rest_framework_jwt.settings import api_settings
 class OffresViewSet(viewsets.ViewSet):
     serializer_class = OffresSerializer
     def list(self, request):
@@ -105,13 +105,9 @@ class DemandesViewSet(viewsets.ViewSet):
 
 class RegisterViewSet(viewsets.ViewSet):
     def create(self, request, *args, **kwargs):
-        # Retrieve the role from the request data
         role = request.data.get('role')
-
-        # Initialize the serializer with the request data
         serializer = UserSerializer(data=request.data)
 
-        # Check if the data is valid
         if serializer.is_valid():
             # Save the user data in the Django database
             instance = serializer.save()
@@ -120,31 +116,41 @@ class RegisterViewSet(viewsets.ViewSet):
             data = serializer.data
             user_data = {
                 'email': data['email'],
-                'password': data['password'],  # Make sure the password is securely stored
+                'password': data['password']
             }
 
             try:
-                # Create the user in Firebase Authentication
+                # Create the user in Firebase Authentication without the name initially
                 firebase_user = auth.create_user(**user_data)
-                auth.update_user(firebase_user.uid, display_name=data['name'])  # Set the display name
+
+                # Now, update the user's display name separately
+                auth.update_user(firebase_user.uid, display_name=data['name'])
 
                 # Create a Firestore client
                 db = firestore.client()
-                
+
                 # Use the Firebase Authentication user ID (uid) as the document ID
                 uid = firebase_user.uid
-                
-                # Save the user data in Firestore under the 'users' collection with the user's UID as the document ID
-                user_data = {
+
+                # Add other user details to the `user_data` dictionary
+                user_data.update({
                     'name': data['name'],
-                    'email': data['email'],
                     'role': data['role'],
                     'phone': data.get('phone'),
                     'dateInscription': data['dateInscription'],
                     'bio': data.get('bio'),
                     'city': data.get('city'),
-                    
-                }
+                    'image': data.get('image')
+                })
+                user_data.pop('password')
+                # Include the Base64 encoded file in the user data if provided
+                if 'file' in data:
+                    user_data['file'] = data['file']
+                if data['role'] == 'company' :
+                    user_data['enabled'] = False
+                else :
+                    user_data['enabled'] = True
+                # Save the user data in Firestore under the 'users' collection with the user's UID as the document ID
                 db.collection('users').document(uid).set(user_data)
 
                 # Return a successful response with the serialized data and a status code of 201_CREATED
@@ -157,6 +163,8 @@ class RegisterViewSet(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+jwt_settings = api_settings.JWT_ENCODE_HANDLER
+
 class LoginAPIView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -165,27 +173,46 @@ class LoginAPIView(APIView):
             password = serializer.validated_data['password']
 
             try:
+                # Retrieve the user by email
                 user = auth.get_user_by_email(email)
-                # Verify user's password
-                auth_user = auth.update_user(
-                    user.uid,
-                    password=password
-                )
-                # Return success response or user data
-                return Response({'message': 'Login successful', 'user': {
-                    'uid': auth_user.uid,
-                    'email': auth_user.email,
-                    'display_name': auth_user.display_name,
+
+                # Check if the user exists
+                if not user:
+                    return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+                # Create a Firestore client
+                db = firestore.client()
+                # Retrieve the user's document in Firestore using the user's UID
+                user_doc = db.collection('users').document(user.uid).get()
+
+                # Verify if the user's account is enabled
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    role = user_data.get('role')
+                    if not user_data.get('enabled', True):
+                        return Response({'error': 'Account disabled'}, status=status.HTTP_403_FORBIDDEN)
+
+                # Generate a JWT token containing user info and role
+                payload = {
+                    'uid': user.uid,
+                    'email': user.email,
+                    'role': role,
+                    'display_name': user.display_name,
                     # Add other user attributes as needed
-                }}, status=status.HTTP_200_OK)
-            except auth.AuthError as e:
+                }
+                token = jwt_settings(payload)
+
+                # Return success response with the token
+                return Response({
+                    'message': 'Login successful',
+                    'token': token
+                }, status=status.HTTP_200_OK)
+            except Exception as e:
+                # Handle any authentication errors
                 return Response({'error': 'Login failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
+            # Return serializer errors
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
 
 
 class ProfileView(APIView):
@@ -233,3 +260,112 @@ class ProfileView(APIView):
         
         # Return success response
         return JsonResponse({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
+
+
+
+
+class AdminCompaniesViewSet(viewsets.ViewSet):
+    def list(self, request):
+        # List all companies (users with 'company' role)
+        db = firestore.client()
+        users_ref = db.collection('users').where('role', '==', 'company')
+        companies = users_ref.stream()
+
+        company_list = []
+        for company in companies:
+            company_data = company.to_dict()
+            company_data['uid'] = company.id
+            company_list.append(company_data)
+
+        return Response(company_list, status=status.HTTP_200_OK)
+
+    def update(self, request, pk=None):
+        # Update the user's account enabled/disabled status
+        enabled = request.data.get('enabled')
+        if enabled is None:
+            return Response({'error': 'Missing "enabled" parameter'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the user's 'enabled' field in Firestore
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk)
+        user_doc.update({'enabled': enabled})
+
+        # Return a successful response
+        return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        # Retrieve user details and file URL
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk).get()
+
+        if not user_doc.exists:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_data = user_doc.to_dict()
+
+        # Return the user data
+        return Response(user_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def download_file(request, pk=None):
+        # Retrieve the user's file URL and download the file
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk).get()
+
+        if not user_doc.exists:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_data = user_doc.to_dict()
+        file_url = user_data.get('file')
+
+        if not file_url:
+            return Response({'error': 'No file available'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Download and return the file
+        # Implement the logic to download the file using file_url and send it as a response
+
+        return Response({'file_url': file_url}, status=status.HTTP_200_OK)
+
+
+class AdminClientsViewSet(viewsets.ViewSet):
+    def list(self, request):
+        # List all companies (users with 'company' role)
+        db = firestore.client()
+        users_ref = db.collection('users').where('role', '==', 'client')
+        clients = users_ref.stream()
+
+        client_list = []
+        for client in clients:
+            client_data = client.to_dict()
+            client_data['uid'] = client.id
+            client_list.append(client_data)
+
+        return Response(client_list, status=status.HTTP_200_OK)
+
+    def update(self, request, pk=None):
+        # Update the user's account enabled/disabled status
+        enabled = request.data.get('enabled')
+        if enabled is None:
+            return Response({'error': 'Missing "enabled" parameter'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the user's 'enabled' field in Firestore
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk)
+        user_doc.update({'enabled': enabled})
+
+        # Return a successful response
+        return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        # Retrieve user details and file URL
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk).get()
+
+        if not user_doc.exists:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_data = user_doc.to_dict()
+
+        # Return the user data
+        return Response(user_data, status=status.HTTP_200_OK)

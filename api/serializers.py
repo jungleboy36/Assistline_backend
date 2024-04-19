@@ -26,7 +26,7 @@ class DemandesSerializer(serializers.HyperlinkedModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'name', 'email', 'password','role', 'phone', 'dateInscription', 'bio','city','file')
+        fields = ('id', 'name', 'email', 'password','role', 'phone', 'dateInscription', 'bio','city','file','image')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates

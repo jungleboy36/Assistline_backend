@@ -1,0 +1,8 @@
+Collecting pyjwt[crypto]
+  Using cached PyJWT-2.8.0-py3-none-any.whl.metadata (4.2 kB)
+Requirement already satisfied: cryptography>=3.4.0 in c:\users\jungleboy\appdata\local\programs\python\python312\lib\site-packages (from pyjwt[crypto]) (42.0.5)
+Requirement already satisfied: cffi>=1.12 in c:\users\jungleboy\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=3.4.0->pyjwt[crypto]) (1.16.0)
+Requirement already satisfied: pycparser in c:\users\jungleboy\appdata\local\programs\python\python312\lib\site-packages (from cffi>=1.12->cryptography>=3.4.0->pyjwt[crypto]) (2.21)
+Using cached PyJWT-2.8.0-py3-none-any.whl (22 kB)
+Installing collected packages: pyjwt
+Successfully installed pyjwt-2.8.0
