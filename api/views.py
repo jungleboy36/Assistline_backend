@@ -14,41 +14,41 @@ from django.core.files.base import ContentFile
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework_jwt.settings import api_settings
+from rest_framework.permissions import IsAuthenticated
+
 class OffresViewSet(viewsets.ViewSet):
     serializer_class = OffresSerializer
+
     def list(self, request):
-        offres = firestore.client().collection('offres').get()
-        data = [{'id': doc.id, **doc.to_dict()} for doc in offres]  # Add 'id' field with document ID
-        #print("****list data :",data)
+        # Check if user_id is provided in the query parameters
+        user_id = request.query_params.get('user_id')
+        
+        if user_id:
+            # If user_id is provided, filter offers by user_id
+            offres = firestore.client().collection('offres').where('user_id', '==', user_id).get()
+        else:
+            # If user_id is not provided, list all offers
+            offres = firestore.client().collection('offres').get()
+        
+        data = [{'id': doc.id, **doc.to_dict()} for doc in offres]
         return Response(data)
 
-    def create(self, request): 
+    def create(self, request):
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
-            i = firestore.client().collection('id').document('number').get().to_dict().get('id')
-            #print("***** i : ", i)
-            id_value =i
-            firestore.client().collection('id').document('number').set({'id':i+1})
             data['creationDate'] = timezone.now()
-            firestore.client().collection('offres').document(str(id_value)).set(data)
-            return Response(data, status=status.HTTP_201_CREATED)
+            firestore.client().collection('offres').add(data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- 
-    def retrieve(self, request, pk=None):
-        offre = firestore.client().collection('offres').document(pk).get()
-        if offre.exists:
-            data = offre.to_dict()
-            return Response(data,status=status.HTTP_200_OK)
-        return Response({'error': 'Offre not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def update(self, request, pk=None):
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
             data['updateDate'] = timezone.now()
-            firestore.client().collection('offres').document(pk).set(data,merge= True)
-            return Response(data)
+            firestore.client().collection('offres').document(pk).set(data, merge=True)
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
@@ -58,24 +58,32 @@ class OffresViewSet(viewsets.ViewSet):
         firestore.client().collection('offres').document(pk).delete()
         return Response(status=status.HTTP_200_OK)
 
+    def retrieve(self, request, pk=None):
+        offre = firestore.client().collection('offres').document(pk).get()
+        if offre.exists:
+            data = offre.to_dict()
+            return Response(data,status=status.HTTP_200_OK)
+        return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
 class DemandesViewSet(viewsets.ViewSet):
     serializer_class = DemandesSerializer
+
     def list(self, request):
-        demandes = firestore.client().collection('demandes').get()
-        data = [{'id': doc.id, **doc.to_dict()} for doc in demandes]  # Add 'id' field with document ID
-        #print("****list data :",data)
+        user_id = request.user.id  # Assuming user ID is available in the request
+        demandes = firestore.client().collection('demandes').where('user_id', '==', user_id).get()
+        data = [{'id': doc.id, **doc.to_dict()} for doc in demandes]
         return Response(data)
 
-    def create(self, request): 
+    def create(self, request):
         serializer = DemandesSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
-            i = firestore.client().collection('id').document('number').get().to_dict().get('id')
-            #print("***** i : ", i)
-            id_value =i
-            firestore.client().collection('id').document('number').set({'id':i+1})
+
             data['creationDate'] = timezone.now()
-            firestore.client().collection('demandes').document(str(id_value)).set(data)
+            data['user_id'] = request.user.id  # Associate demand with user
+            firestore.client().collection('demandes').add(data)
             return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  

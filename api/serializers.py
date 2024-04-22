@@ -6,7 +6,8 @@ class OffresSerializer(serializers.HyperlinkedModelSerializer):
     # specify model and fields
     class Meta:
         model = Offre
-        fields = ('title', 'description','creationDate','updateDate')
+        fields = ('title', 'description', 'creationDate', 'updateDate', 'user_id',
+                  'depart_date', 'arrival_date', 'itinerary', 'volume', 'price')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
@@ -16,7 +17,7 @@ class DemandesSerializer(serializers.HyperlinkedModelSerializer):
     # specify model and fields
     class Meta:
         model = Demande
-        fields = ('title', 'description','creationDate','updateDate')
+        fields = ('title', 'description','creationDate','updateDate','user_id')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
