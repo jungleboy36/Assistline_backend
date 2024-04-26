@@ -21,6 +21,11 @@ class Demande(models.Model):
 	description = models.TextField()
 	creationDate = models.DateTimeField(auto_now_add=True)
 	updateDate = models.DateTimeField(auto_now=True) 
+	date = models.DateTimeField(null=True, blank=True)
+	depart = models.TextField()
+	destination = models.TextField()
+	volume = models.FloatField()
+	price = models.FloatField()
 	user_id = models.TextField()
 
 	def __str__(self):
@@ -28,7 +33,7 @@ class Demande(models.Model):
 
 class User(models.Model):
     name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     password = models.CharField(max_length=50)
     enabled = models.BooleanField(default=True)
     role = models.CharField(max_length=20)
@@ -38,6 +43,5 @@ class User(models.Model):
     city = models.CharField(max_length=100, blank=True)
     image = models.TextField(blank=True)
     file = models.TextField(blank=True, null=True)
-    offres = models.TextField(blank=True)
-    demandes = models.TextField(blank=True)
+    hideEmail = models.BooleanField(default=True)
 	  # Only for companies

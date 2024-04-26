@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import viewsets
 from .serializers import *
-from firebase_admin import firestore
+from firebase_admin import firestore, auth
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
 from firebase_admin import auth
@@ -15,24 +15,84 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework_jwt.settings import api_settings
 from rest_framework.permissions import IsAuthenticated
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from functools import wraps
+
+def requires_role(allowed_roles):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, request, *args, **kwargs):
+            user_auth, role = authenticate(request)
+            if not user_auth or role not in allowed_roles:
+                return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+            return func(self, request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+import base64
+
+def authenticate(request):
+    try:
+        authorization_header = request.headers.get('Authorization')
+        if authorization_header and authorization_header.startswith('Bearer '):
+            # Extract the token from the Authorization header
+            id_token_encoded = authorization_header[len('Bearer '):]
+            
+            # Decode the Base64-encoded token
+            id_token_decoded = base64.b64decode(id_token_encoded).decode('utf-8')
+            
+            # Verify the decoded token with Firebase Authentication
+            decoded_token = auth.verify_id_token(id_token_decoded)
+            #print('Decoded token : ', decoded_token)
+            
+            user_id = decoded_token['uid']
+            role = firestore.client().collection('users').document(user_id).get().to_dict()
+            role = role['role']
+            print('Role : ', role)
+            
+            return user_id, role
+    except Exception as e:
+        print(f"Error verifying token in authorization header: {e}")
+        pass  # Continue checking for token in other sources
+    
+    # No valid token found
+    return None, None  # Or return an error response indicating missing token
+
 
 class OffresViewSet(viewsets.ViewSet):
-    serializer_class = OffresSerializer
-
-    def list(self, request):
         # Check if user_id is provided in the query parameters
-        user_id = request.query_params.get('user_id')
-        
-        if user_id:
-            # If user_id is provided, filter offers by user_id
-            offres = firestore.client().collection('offres').where('user_id', '==', user_id).get()
-        else:
-            # If user_id is not provided, list all offers
-            offres = firestore.client().collection('offres').get()
-        
-        data = [{'id': doc.id, **doc.to_dict()} for doc in offres]
-        return Response(data)
+    @requires_role(['client', 'company'])
+    def list(self, request):
+        #user_auth, role = authenticate(request)
+        # Check if user_id is provided in the query parameters
+        #if user_auth and role == 'client'or role =='company':
+            user_id = request.query_params.get('user_id')
+            if user_id:
+                # If user_id is provided, filter offers by user_id
+                offres = firestore.client().collection('offres').where('user_id', '==', user_id).get()
+            else:
+                # If user_id is not provided, list all offers
+                offres = firestore.client().collection('offres').get()
+            
+            data = []
+            user =[]
+            for doc in offres:
+                offer_data = doc.to_dict()
+                user_id = offer_data.get('user_id')
+                # Fetch user information based on user_id
+                if user_id is not None:
+                    user = firestore.client().collection('users').document(user_id).get().to_dict()
+                    # Add user information to offer data
+                    offer_data['username'] = user['name']
+                    offer_data['picture'] = user['image']
+                
+                data.append({'id': doc.id, **offer_data})
+            return Response(data)
 
+    @requires_role(['company'])
     def create(self, request):
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
@@ -41,7 +101,7 @@ class OffresViewSet(viewsets.ViewSet):
             firestore.client().collection('offres').add(data)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    @requires_role(['company'])
     def update(self, request, pk=None):
         serializer = OffresSerializer(data=request.data)
         if serializer.is_valid():
@@ -50,14 +110,14 @@ class OffresViewSet(viewsets.ViewSet):
             firestore.client().collection('offres').document(pk).set(data, merge=True)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    @requires_role(['company'])
     def partial_update(self, request, pk=None):
         return self.update(request, pk)
-
+    @requires_role(['company'])
     def destroy(self, request, pk=None):
         firestore.client().collection('offres').document(pk).delete()
         return Response(status=status.HTTP_200_OK)
-
+    @requires_role(['company'])
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('offres').document(pk).get()
         if offre.exists:
@@ -69,31 +129,50 @@ class OffresViewSet(viewsets.ViewSet):
 
 class DemandesViewSet(viewsets.ViewSet):
     serializer_class = DemandesSerializer
-
+    @requires_role(['client', 'company'])
     def list(self, request):
-        user_id = request.user.id  # Assuming user ID is available in the request
-        demandes = firestore.client().collection('demandes').where('user_id', '==', user_id).get()
-        data = [{'id': doc.id, **doc.to_dict()} for doc in demandes]
-        return Response(data)
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            # If user_id is provided, filter offers by user_id
+            demandes = firestore.client().collection('demandes').where('user_id', '==', user_id).get()
+        else:
+            # If user_id is not provided, list all offers
+            demandes = firestore.client().collection('demandes').get()
 
+        data = []
+        user =[]
+        for doc in demandes:
+            demande_data = doc.to_dict()
+            user_id = demande_data.get('user_id')
+            # Fetch user information based on user_id
+            if user_id is not None:
+                print('*********user id: ',user_id)
+
+                user = firestore.client().collection('users').document(user_id).get().to_dict()
+                # Add user information to demande data
+                demande_data['username'] = user['name']
+                demande_data['picture'] = user['image']
+            
+            data.append({'id': doc.id, **demande_data})
+        return Response(data)
+    @requires_role(['client'])
     def create(self, request):
         serializer = DemandesSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
 
             data['creationDate'] = timezone.now()
-            data['user_id'] = request.user.id  # Associate demand with user
             firestore.client().collection('demandes').add(data)
             return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- 
+    @requires_role(['client', 'company'])
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('demandes').document(pk).get()
         if offre.exists:
             data = offre.to_dict()
             return Response(data,status=status.HTTP_200_OK)
         return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
-
+    @requires_role(['client'])
     def update(self, request, pk=None):
         serializer = DemandesSerializer(data=request.data)
         if serializer.is_valid():
@@ -102,10 +181,10 @@ class DemandesViewSet(viewsets.ViewSet):
             firestore.client().collection('demandes').document(pk).set(data,merge= True)
             return Response(data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    @requires_role(['client'])
     def partial_update(self, request, pk=None):
         return self.update(request, pk)
-
+    @requires_role(['client'])
     def destroy(self, request, pk=None):
         firestore.client().collection('demandes').document(pk).delete()
         return Response(status=status.HTTP_200_OK)
@@ -133,7 +212,8 @@ class RegisterViewSet(viewsets.ViewSet):
 
                 # Now, update the user's display name separately
                 auth.update_user(firebase_user.uid, display_name=data['name'])
-
+                link = auth.generate_email_verification_link(data['email'], action_code_settings=None)
+                send_verification_email('achrafhafsia9@gmail.com',link,data['role'])
                 # Create a Firestore client
                 db = firestore.client()
 
@@ -192,6 +272,7 @@ class LoginAPIView(APIView):
                 db = firestore.client()
                 # Retrieve the user's document in Firestore using the user's UID
                 user_doc = db.collection('users').document(user.uid).get()
+                id_token = firebase_authenticate(email, password)
 
                 # Verify if the user's account is enabled
                 if user_doc.exists:
@@ -209,12 +290,19 @@ class LoginAPIView(APIView):
                     # Add other user attributes as needed
                 }
                 token = jwt_settings(payload)
+                print("*********** authenticated : "+ id_token)
+                if(is_user_verified(user.uid) and id_token):
+                    return Response({
+                        'message': 'Login successful',
+                        'token': token
+                    }, status=status.HTTP_200_OK)
+                elif(id_token) :
+                    return
+                elif(not is_user_verified(user.uid)) :
+                    return Response({'error': 'Email unverified'}, status=status.HTTP_403_FORBIDDEN)
+                elif (error_message):
+                    return Response({'error': 'Email ou mot de passe erroné'}, status=status.HTTP_403_FORBIDDEN)
 
-                # Return success response with the token
-                return Response({
-                    'message': 'Login successful',
-                    'token': token
-                }, status=status.HTTP_200_OK)
             except Exception as e:
                 # Handle any authentication errors
                 return Response({'error': 'Login failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -260,7 +348,7 @@ class ProfileView(APIView):
         updated_data = request.data
         
         # Only update the allowed fields in Firestore
-        allowed_fields = ['name', 'phone', 'bio', 'city', 'image', 'role']
+        allowed_fields = ['name', 'phone', 'bio', 'city', 'image', 'role','hideEmail']
         filtered_data = {field: updated_data[field] for field in allowed_fields if field in updated_data}
 
         # Update Firestore document
@@ -273,6 +361,7 @@ class ProfileView(APIView):
 
 
 class AdminCompaniesViewSet(viewsets.ViewSet):
+    @requires_role(['admin'])
     def list(self, request):
         # List all companies (users with 'company' role)
         db = firestore.client()
@@ -281,12 +370,13 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
 
         company_list = []
         for company in companies:
-            company_data = company.to_dict()
-            company_data['uid'] = company.id
-            company_list.append(company_data)
+            if(is_user_verified(company.id)):
+                company_data = company.to_dict()
+                company_data['uid'] = company.id
+                company_list.append(company_data)
 
         return Response(company_list, status=status.HTTP_200_OK)
-
+    @requires_role(['admin'])
     def update(self, request, pk=None):
         # Update the user's account enabled/disabled status
         enabled = request.data.get('enabled')
@@ -300,7 +390,7 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
-
+    @requires_role(['admin'])
     def retrieve(self, request, pk=None):
         # Retrieve user details and file URL
         db = firestore.client()
@@ -314,7 +404,7 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
         # Return the user data
         return Response(user_data, status=status.HTTP_200_OK)
 
-
+@requires_role(['admin'])
 @api_view(['GET'])
 def download_file(request, pk=None):
         # Retrieve the user's file URL and download the file
@@ -337,6 +427,7 @@ def download_file(request, pk=None):
 
 
 class AdminClientsViewSet(viewsets.ViewSet):
+    @requires_role(['admin'])
     def list(self, request):
         # List all companies (users with 'company' role)
         db = firestore.client()
@@ -345,12 +436,13 @@ class AdminClientsViewSet(viewsets.ViewSet):
 
         client_list = []
         for client in clients:
-            client_data = client.to_dict()
-            client_data['uid'] = client.id
-            client_list.append(client_data)
+            if(is_user_verified(client.id)):
+                client_data = client.to_dict()
+                client_data['uid'] = client.id
+                client_list.append(client_data)
 
         return Response(client_list, status=status.HTTP_200_OK)
-
+    @requires_role(['admin'])
     def update(self, request, pk=None):
         # Update the user's account enabled/disabled status
         enabled = request.data.get('enabled')
@@ -364,7 +456,7 @@ class AdminClientsViewSet(viewsets.ViewSet):
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
-
+    @requires_role(['admin'])
     def retrieve(self, request, pk=None):
         # Retrieve user details and file URL
         db = firestore.client()
@@ -377,3 +469,71 @@ class AdminClientsViewSet(viewsets.ViewSet):
 
         # Return the user data
         return Response(user_data, status=status.HTTP_200_OK)
+
+
+def send_verification_email(receiver_email, verification_link,role):
+    # Set up the SMTP server
+    smtp_server = 'smtp.gmail.com'
+    smtp_port = 587  # For TLS
+
+    # Your Gmail credentials
+    gmail_sender_email = 'achrafhafsia36@gmail.com'
+    gmail_app_password = 'zuhm ourh kjug jnkk'
+
+    # Create a message
+    message = MIMEMultipart()
+    message['From'] = gmail_sender_email
+    message['To'] = receiver_email
+    message['Subject'] = 'Email Verification'
+
+    # Add body to email
+    if role =='client':
+        body = f'Click the following link to verify your email: {verification_link}'
+    elif role == 'company':
+        body = f'Click the following link to verify your email: {verification_link} After Confirmation you will have to wait until the admin activates your account after verifying the uploaded files0'
+
+    message.attach(MIMEText(body, 'plain'))
+
+    # Create SMTP session
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()  # Enable TLS
+        server.login(gmail_sender_email, gmail_app_password)
+        server.sendmail(gmail_sender_email, receiver_email, message.as_string())
+
+#send_verification_email('achrafhafsia9@gmail.com','test')
+
+
+def is_user_verified(user_id):
+    try:
+        # Retrieve user information
+        user = auth.get_user(user_id)
+        
+        # Check if the user's email is verified
+        if user.email_verified:
+            return True
+        else:
+            return False
+    except auth.UserNotFoundError:
+        # Handle case where user does not exist
+        return False
+    except Exception as e:
+        # Handle other errors
+        print("Error:", e)
+        return False
+
+
+
+class GetRoleFromToken(APIView):
+    def get(self, request, id_token):
+        if not id_token:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        user = auth.get_user_by_email(id_token)
+        print('user:',user.uid)
+        user_doc = firestore.client().collection('users').document(user.uid).get().to_dict()
+
+        role = user_doc['role']
+        if not role:
+            return Response({'error': 'Role not found for user'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({'role': role}, status=status.HTTP_200_OK)
+

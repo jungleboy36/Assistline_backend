@@ -142,4 +142,3 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies' ]
 
- 
