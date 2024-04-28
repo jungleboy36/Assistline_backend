@@ -404,9 +404,9 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
         # Return the user data
         return Response(user_data, status=status.HTTP_200_OK)
 
-@requires_role(['admin'])
 @api_view(['GET'])
 def download_file(request, pk=None):
+    
         # Retrieve the user's file URL and download the file
         db = firestore.client()
         user_doc = db.collection('users').document(pk).get()
@@ -425,6 +425,24 @@ def download_file(request, pk=None):
 
         return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
+@api_view(['GET'])
+def check_status(request, pk=None):
+        db = firestore.client()
+        user_doc = db.collection('users').document(pk).get()
+
+        if not user_doc.exists:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_data = user_doc.to_dict()
+        enabled = user_data.get('enabled')
+
+        if enabled is None:
+            return Response({'error': 'No enabled status available'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Download and return the file
+        # Implement the logic to download the file using file_url and send it as a response
+
+        return Response({'enabled': enabled}, status=status.HTTP_200_OK)
 
 class AdminClientsViewSet(viewsets.ViewSet):
     @requires_role(['admin'])

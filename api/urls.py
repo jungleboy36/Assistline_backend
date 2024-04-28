@@ -27,4 +27,5 @@ urlpatterns = [
 	path('api-auth/', include('rest_framework.urls')),
 	path('ad-api/companies/<str:pk>/download-file/', download_file, name='download_file'),
 	path('get-role/<str:id_token>/', GetRoleFromToken.as_view(), name='get-role'),
+	path('status/<str:pk>/',check_status, name='check_status'),
 ]
