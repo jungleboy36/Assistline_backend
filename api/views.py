@@ -18,8 +18,12 @@ from rest_framework.permissions import IsAuthenticated
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from .models import Notification
 from functools import wraps
+from django.views.decorators.csrf import csrf_exempt
+import json
+from google.cloud.firestore_v1.base_query import FieldFilter
+from django.http import JsonResponse
 
 def requires_role(allowed_roles):
     def decorator(func):
@@ -99,6 +103,21 @@ class OffresViewSet(viewsets.ViewSet):
             data = serializer.validated_data
             data['creationDate'] = timezone.now()
             firestore.client().collection('offres').add(data)
+            notification_message = f'Nouvelle offre ajouté: {data["title"]}'
+                # Save the notification to the 'notifications' collection in Firestore
+            notification_data = {
+                      # Replace with admin user ID
+                    'message': notification_message,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                }
+            notification_ref = firestore.client().collection('notifications').add(notification_data)
+            notification_id = notification_ref[1].id
+            
+            # Update users with role 'client' to add the notification ID to their notifications array
+            clients = firestore.client().collection('users').where('role', '==', 'client').get()
+            for client in clients:
+                client_ref = firestore.client().collection('users').document(client.id)
+                client_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['company'])
@@ -117,7 +136,7 @@ class OffresViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         firestore.client().collection('offres').document(pk).delete()
         return Response(status=status.HTTP_200_OK)
-    @requires_role(['company'])
+    @requires_role(['company','client'])
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('offres').document(pk).get()
         if offre.exists:
@@ -163,6 +182,22 @@ class DemandesViewSet(viewsets.ViewSet):
 
             data['creationDate'] = timezone.now()
             firestore.client().collection('demandes').add(data)
+            notification_message = f'Nouvelle demande ajouté: {data["title"]}'
+                # Save the notification to the 'notifications' collection in Firestore
+            notification_data = {
+                      # Replace with admin user ID
+                    'message': notification_message,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                   
+                }
+            notification_ref =  db.collection('notifications').add(notification_data)
+            notification_id = notification_ref[1].id
+            
+            # Update users with role 'client' to add the notification ID to their notifications array
+            companies = firestore.client().collection('users').where('role', '==', 'company').get()
+            for company in companies:
+                company_ref = firestore.client().collection('users').document(company.id)
+                company_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
             return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['client', 'company'])
@@ -240,9 +275,29 @@ class RegisterViewSet(viewsets.ViewSet):
                     user_data['enabled'] = True
                 # Save the user data in Firestore under the 'users' collection with the user's UID as the document ID
                 db.collection('users').document(uid).set(user_data)
-
+                
                 # Return a successful response with the serialized data and a status code of 201_CREATED
+            
+                notification_message = f'New {role} registered: {data["name"]}'
+                # Save the notification to the 'notifications' collection in Firestore
+                notification_data = {
+                      # Replace with admin user ID
+                    'message': notification_message,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                    
+                }
+
+                notification_ref = db.collection('notifications').add(notification_data)
+                
+                # Retrieve the ID of the notification
+                notification_id = notification_ref.id
+                
+                # Update the user's document to include the notification ID
+                db.collection('users').document('pcVxTGFxIxN6ejqR7mLHSQnUFhZ2').update({
+                    'notification_id': notification_id
+                })
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
+
             except Exception as e:
                 # Handle any errors that occur during user creation in Firebase
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -508,7 +563,7 @@ def send_verification_email(receiver_email, verification_link,role):
     if role =='client':
         body = f'Click the following link to verify your email: {verification_link}'
     elif role == 'company':
-        body = f'Click the following link to verify your email: {verification_link} After Confirmation you will have to wait until the admin activates your account after verifying the uploaded files0'
+        body = f'Click the following link to verify your email: {verification_link} After Confirmation you will have to wait until the admin activates your account after verifying the uploaded files'
 
     message.attach(MIMEText(body, 'plain'))
 
@@ -555,3 +610,161 @@ class GetRoleFromToken(APIView):
 
         return Response({'role': role}, status=status.HTTP_200_OK)
 
+
+
+db = firestore.client()
+
+            # Count the number of documents in the 'users' collection with role 'client'
+#client_count = len(list(db.collection('users').where('role', '==', 'client').where('enabled', '==', True).stream()))
+
+            # Count the number of documents in the 'users' collection with role 'company'
+#company_count = len(list(db.collection('users').where('role', '==', 'company').where('enabled', '==', True).stream()))
+
+            # Count the number of documents in the 'offres' collection
+#offres_count = len(list(db.collection('offres').stream()))
+
+            # Count the number of documents in the 'demandes' collection
+#demandes_count = len(list(db.collection('demandes').stream()))
+
+
+class DocumentCountAPIView(APIView):
+    def get(self, request):
+        try:
+            # Initialize Firestore client
+
+
+            # Return the counts as a JSON response
+            return Response({
+                'client_count': client_count,
+                'company_count': company_count,
+                'offres_count': offres_count,
+                'demandes_count': demandes_count
+            })
+        except Exception as e:
+            # Handle any exceptions
+            return Response({'error': str(e)}, status=500)
+
+
+
+class NotificationsAPIView(APIView):
+    def get(self, request):
+        # Get the user ID from the request (assuming it's passed as a query parameter)
+        user_id = request.GET.get('user_id')
+
+        if not user_id:
+            return JsonResponse({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create a Firestore client
+        db = firestore.client()
+
+        try:
+            # Retrieve the user's document
+            user_doc_ref = db.collection('users').document(user_id)
+            user_doc = user_doc_ref.get()
+
+            if not user_doc.exists:
+                return JsonResponse({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Get the list of notification IDs from the user's document
+            notification_ids = user_doc.to_dict().get('notifications', [])
+
+            if not notification_ids:
+                return JsonResponse([], status=status.HTTP_200_OK)
+
+            # Retrieve notification details for each ID
+            notifications = []
+            for notification_id in notification_ids:
+                notification_ref = db.collection('notifications').document(notification_id)
+                notification_doc = notification_ref.get()
+
+                if notification_doc.exists:
+                    notification_data = notification_doc.to_dict()
+                    notifications.append(notification_data)
+
+            return JsonResponse(notifications, status=status.HTTP_200_OK, safe=False)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@csrf_exempt
+def mark_all_as_read(request):
+    # Get user ID from the request (assuming it's passed somehow)
+    user_id = request.GET.get('user_id')
+
+    if not user_id:
+        return JsonResponse({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Initialize Firestore database
+        db = firestore.client()
+
+        # Update the user document to empty the notifications array
+        user_ref = db.collection('users').document(user_id)
+        user_ref.update({'notifications': []})
+
+        return JsonResponse({'message': 'Notifications marked as read and cleared'}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+db = firestore.client()
+
+@api_view(['GET'])
+def get_conversations(request,user_id):
+    try:
+        conversations_ref = db.collection('conversations').where('participants', 'array_contains', user_id)
+        conversations = [conv.to_dict() for conv in conversations_ref.stream()]
+        return JsonResponse(conversations, safe=False)
+    except Exception as e:
+        # Log or return the error message
+        return JsonResponse({'error': str(e)}, status=500)
+from operator import itemgetter
+
+@api_view(['GET'])
+def get_messages(request, conversation_id):
+    # Fetch messages for a specific conversation from Firebase Firestore
+    messages_ref = db.collection('messages').where(filter=FieldFilter('conversation_id','==',conversation_id))
+    messages = [msg.to_dict() for msg in messages_ref.stream()]
+    messages = sorted(messages, key=itemgetter('time'))
+    return JsonResponse(messages, safe=False)
+
+@api_view(['POST'])
+def create_message(request):
+    if request.method == 'POST':
+        # Extract message data from request
+        data = request.data.copy()
+        data["time"] = timezone.now()
+        if not data.get("conversation_id") :
+            conversation_data = {
+                'participants' : [data.get("sender_id"),data.get("receiver_id")],
+                'display_names': [data.get("sender_display_name"),data.get("receiver_display_name")],
+                'last_message' : data.get("message"),
+                'time' : timezone.now()
+            }
+            conversation_ref =  db.collection('conversations').add(conversation_data)
+            conversation_id = conversation_ref[1].id
+            conversation_ref = db.collection('conversations').document(conversation_id)
+            conversation_ref.update({'id':conversation_id})
+            data["conversation_id"] = conversation_id
+        else :
+            conversation_data = {
+                'last_message' : data.get("message"),
+                'time' : timezone.now()
+            }
+            doc_ref = db.collection("conversations").document(data.get('conversation_id'))
+            doc_ref.update(conversation_data)
+
+        message = {
+            "sender_id": data.get("sender_id"),
+            "message": data.get("message"),
+            "time" : timezone.now(),
+            "display_name": data.get("display_name"),
+            "conversation_id" : data.get("conversation_id")
+        }
+        # Create a new message object in Firebase Firestore
+        messages_ref = db.collection('messages')
+        messages_ref.add(message)
+        # Return success response
+        return JsonResponse({'success': True})
+    else:
+        # Return error response for unsupported HTTP method
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
