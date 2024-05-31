@@ -34,5 +34,19 @@ urlpatterns = [
 	path('conversations/<str:user_id>/', get_conversations, name='get_conversations'),
     path('messages/<str:conversation_id>/', get_messages, name='get_messages'),
     path('send/', create_message, name='create_message'),
+	path('update-user-presence/', update_user_presence, name='update_user_presence'),
+	path('get-user-presence/', get_user_presence, name='get_user_presence'),
+    path('create-conversation/', create_conversation, name='create_conversation'),
+	path('send-email/',send_email,name='send_email'),
+	path('auto-message/',save_autoMessage,name='save_autoMessage'),
+	path('create_payment/',create_payment,name='create_payment'),
+	path('update_payment/<str:payment_id>/<str:conversation_id>/',update_payment,name='update_payment'),
+	path('retrieve_payment/<str:payment_id>/',retrieve_payment,name='retrieve_payment'),
+	path('delete_payment/<str:payment_id>/<str:conversation_id>/',delete_payment,name='delete_payment'),
+	path('save_feedback/',save_feedback,name='save_feedback'),
+	path('retrieve_feedback/',retrieve_feedback,name='retrieve_feedback'),
+
+
 
 ]
+

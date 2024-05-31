@@ -24,6 +24,11 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from google.cloud.firestore_v1.base_query import FieldFilter
 from django.http import JsonResponse
+from django.core.serializers.json import DjangoJSONEncoder
+import paypalrestsdk
+from pusher import Pusher
+
+
 
 def requires_role(allowed_roles):
     def decorator(func):
@@ -37,6 +42,16 @@ def requires_role(allowed_roles):
     return decorator
 
 import base64
+
+pusher = Pusher(
+                app_id = "1801083",
+                key = "1c26d2cd463b15a19666",
+                secret = "e4e61f70e4b17c1a7de8",
+                cluster = "eu",
+                ssl=True,
+                )
+
+
 
 def authenticate(request):
     try:
@@ -68,7 +83,6 @@ def authenticate(request):
 
 class OffresViewSet(viewsets.ViewSet):
         # Check if user_id is provided in the query parameters
-    @requires_role(['client', 'company'])
     def list(self, request):
         #user_auth, role = authenticate(request)
         # Check if user_id is provided in the query parameters
@@ -136,11 +150,12 @@ class OffresViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         firestore.client().collection('offres').document(pk).delete()
         return Response(status=status.HTTP_200_OK)
-    @requires_role(['company','client'])
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('offres').document(pk).get()
         if offre.exists:
             data = offre.to_dict()
+            user = firestore.client().collection('users').document(data.get('user_id')).get().to_dict()
+            data['username'] = user['name']
             return Response(data,status=status.HTTP_200_OK)
         return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -205,6 +220,8 @@ class DemandesViewSet(viewsets.ViewSet):
         offre = firestore.client().collection('demandes').document(pk).get()
         if offre.exists:
             data = offre.to_dict()
+            user = firestore.client().collection('users').document(data.get('user_id')).get().to_dict()
+            data['username'] = user['name']
             return Response(data,status=status.HTTP_200_OK)
         return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
     @requires_role(['client'])
@@ -403,7 +420,7 @@ class ProfileView(APIView):
         updated_data = request.data
         
         # Only update the allowed fields in Firestore
-        allowed_fields = ['name', 'phone', 'bio', 'city', 'image', 'role','hideEmail']
+        allowed_fields = ['name', 'phone', 'bio', 'city', 'image', 'role','hideEmail','paypalEmail']
         filtered_data = {field: updated_data[field] for field in allowed_fields if field in updated_data}
 
         # Update Firestore document
@@ -442,6 +459,15 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
         db = firestore.client()
         user_doc = db.collection('users').document(pk)
         user_doc.update({'enabled': enabled})
+        user = db.collection('users').document(pk).get().to_dict()
+        print(user['email'])
+        username = user['name']
+        if enabled :
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username},\nnous vous informons que votre compte a été désactivé.')
+
+        else :
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username},\nnous vous informons que votre compte a été activé.')
+
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
@@ -526,6 +552,14 @@ class AdminClientsViewSet(viewsets.ViewSet):
         db = firestore.client()
         user_doc = db.collection('users').document(pk)
         user_doc.update({'enabled': enabled})
+        user = db.collection('users').document(pk).get().to_dict()
+        print(user['email'])
+        username = user["name"]
+        if enabled :
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
+
+        else :
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été activé.')
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
@@ -574,6 +608,33 @@ def send_verification_email(receiver_email, verification_link,role):
         server.sendmail(gmail_sender_email, receiver_email, message.as_string())
 
 #send_verification_email('achrafhafsia9@gmail.com','test')
+
+
+def send_email(receiver_email, body):
+    # Set up the SMTP server
+    smtp_server = 'smtp.gmail.com'
+    smtp_port = 587  # For TLS
+
+    # Your Gmail credentials
+    gmail_sender_email = 'achrafhafsia36@gmail.com'
+    gmail_app_password = 'zuhm ourh kjug jnkk'
+
+    # Create a message
+    message = MIMEMultipart()
+    message['From'] = gmail_sender_email
+    message['To'] = receiver_email
+    message['Subject'] = 'Assistline'
+
+    # Add body to email
+    message.attach(MIMEText(body, 'plain'))
+
+    # Create SMTP session
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()  # Enable TLS
+        server.login(gmail_sender_email, gmail_app_password)
+        server.sendmail(gmail_sender_email, receiver_email, message.as_string())
+
+
 
 
 def is_user_verified(user_id):
@@ -669,7 +730,7 @@ class NotificationsAPIView(APIView):
             notification_ids = user_doc.to_dict().get('notifications', [])
 
             if not notification_ids:
-                return JsonResponse([], status=status.HTTP_200_OK)
+                return JsonResponse([], status=status.HTTP_200_OK, safe=False)
 
             # Retrieve notification details for each ID
             notifications = []
@@ -709,20 +770,25 @@ def mark_all_as_read(request):
 db = firestore.client()
 
 @api_view(['GET'])
-def get_conversations(request,user_id):
+def get_conversations(request, user_id):
     try:
         conversations_ref = db.collection('conversations').where('participants', 'array_contains', user_id)
         conversations = [conv.to_dict() for conv in conversations_ref.stream()]
-        return JsonResponse(conversations, safe=False)
+
+        # Sort conversations based on the timestamp field in descending order
+        sorted_conversations = sorted(conversations, key=lambda x: x.get('timestamp', 0), reverse=True)
+
+        return JsonResponse(sorted_conversations, safe=False)
     except Exception as e:
         # Log or return the error message
         return JsonResponse({'error': str(e)}, status=500)
+
 from operator import itemgetter
 
 @api_view(['GET'])
 def get_messages(request, conversation_id):
     # Fetch messages for a specific conversation from Firebase Firestore
-    messages_ref = db.collection('messages').where(filter=FieldFilter('conversation_id','==',conversation_id))
+    messages_ref = db.collection('messages').where(filter=FieldFilter('id','==',conversation_id))
     messages = [msg.to_dict() for msg in messages_ref.stream()]
     messages = sorted(messages, key=itemgetter('time'))
     return JsonResponse(messages, safe=False)
@@ -733,7 +799,7 @@ def create_message(request):
         # Extract message data from request
         data = request.data.copy()
         data["time"] = timezone.now()
-        if not data.get("conversation_id") :
+        if not data.get("id") :
             conversation_data = {
                 'participants' : [data.get("sender_id"),data.get("receiver_id")],
                 'display_names': [data.get("sender_display_name"),data.get("receiver_display_name")],
@@ -744,13 +810,13 @@ def create_message(request):
             conversation_id = conversation_ref[1].id
             conversation_ref = db.collection('conversations').document(conversation_id)
             conversation_ref.update({'id':conversation_id})
-            data["conversation_id"] = conversation_id
+            data["id"] = conversation_id
         else :
             conversation_data = {
                 'last_message' : data.get("message"),
                 'time' : timezone.now()
             }
-            doc_ref = db.collection("conversations").document(data.get('conversation_id'))
+            doc_ref = db.collection("conversations").document(data.get('id'))
             doc_ref.update(conversation_data)
 
         message = {
@@ -758,13 +824,228 @@ def create_message(request):
             "message": data.get("message"),
             "time" : timezone.now(),
             "display_name": data.get("display_name"),
-            "conversation_id" : data.get("conversation_id")
+            "id" : data.get("id")
         }
+
         # Create a new message object in Firebase Firestore
         messages_ref = db.collection('messages')
-        messages_ref.add(message)
+        debug = db.collection('messages').where("id", "==", data.get("id")).stream()
+        x = len(list(debug))
+        print("**** messages: ", x)
+        print("Comparison result:", x == 0)
+
+        msg = db.collection('users').document(data.get('sender_id')).get().to_dict()
+        send = False
+        if (x == 0) and msg['role'] == "company" and 'autoMessage' in msg and msg.get('autoMessage') != '':
+            auto_message = {
+            "sender_id": data.get("receiver_id"),
+            "message": msg['autoMessage'],
+            "time" : timezone.now(),
+            "display_name": data.get("display_name"),
+            "id" : data.get("id")
+            }
+            messages_ref.add(message)
+            messages_ref.add(auto_message)
+        else:
+            messages_ref.add(message)
+
         # Return success response
+        current_time = timezone.now()
+
+# Serialize the datetime object to a JSON-serializable format
+        serialized_time = json.dumps(current_time, cls=DjangoJSONEncoder)
+        pusher.trigger(data.get('sender_id'),'new-message',{'conversation_id':data.get('id'),'userId':data.get('receiver_id'),'username':data.get('sender_display_name'),'time':serialized_time})
         return JsonResponse({'success': True})
     else:
         # Return error response for unsupported HTTP method
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@api_view(['POST'])
+def update_user_presence(request):
+    data = request.data.copy()
+    user = data.get('userId')
+    doc_ref = db.collection("users").document(user)
+    doc_ref.update({'online':data.get('online')})
+    pusher.trigger('users','status',{'userId':user})
+    return Response({'message': 'User presence updated successfully'}, status=200)
+
+@api_view(['GET'])
+def get_user_presence(request):
+    userId = request.query_params.get('userId')
+    print("********user presence id : ",userId)
+    doc_ref = db.collection("users").document(userId).get()
+    data = doc_ref.to_dict()
+    
+    online_status = data.get('online', None)  # Check if "online" attribute exists
+    print("***** online status: ",online_status)
+    return Response({'online': online_status}, status=200)
+
+
+@api_view(['POST'])
+def create_conversation(request):
+    try:
+        data = request.data.copy()
+        conversations_ref = db.collection('conversations')
+        sender_conversations = conversations_ref.where('participants', 'array_contains', data.get('sender_id')).stream()
+
+        # Get conversations where both sender and receiver are participants
+        common_conversations = [
+            conv.reference.id for conv in sender_conversations
+            if any(participant == data.get('receiver_id') for participant in conv.to_dict().get('participants', []))
+        ]
+        
+        if not common_conversations:
+            conversation_data = {
+                'participants': [data.get("receiver_id"), data.get("sender_id")],
+                'time': timezone.now(),
+                'display_names' : [data.get("receiver_display_name"),data.get("sender_display_name"),
+                ]
+            }
+            new_conversation_ref = db.collection("conversations").add(conversation_data)
+            print("**** new conversation ref: ", new_conversation_ref)
+            new_conversation_id = new_conversation_ref[1].id
+            new_conversation_ref = db.collection("conversations").document(new_conversation_id)
+            new_conversation_ref.update({'id':new_conversation_id})
+            return JsonResponse({'message': 'Conversation created successfully'}, status=200)
+        else:
+            db.collection('conversations').document(common_conversations[0]).update({'time': timezone.now()})
+            return JsonResponse({'message': 'Conversation already exists', 'conversation_id': common_conversations[0]}, status=200)
+    except Exception as e:
+        # Log or return the error message
+        return JsonResponse({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+def save_autoMessage(request):
+    data = request.data.copy()
+    if not data.get('userId'): 
+        return Response({'error':'userId is required'},status=400)
+    db.collection('users').document(data.get('userId')).update({'autoMessage' : data.get('message')})
+    return Response({'message':'auto message updated successfully'},status=200)
+
+
+
+@api_view(['POST'])
+@csrf_exempt
+def create_payment(request):
+    if request.method == 'POST':
+        # Extract data from request
+        data = request.data.copy()
+        # Example data: {'amount': '100', 'description': 'Payment for service'}
+        
+        # Create a new payment document
+        payment_ref = db.collection('payments').document()
+        payment_data ={
+            'amount': data.get('amount'),
+            'sender_id' : data.get('sender_id'),
+            'receiver_id' : data.get('receiver_id'),
+            'paid' : False,}
+
+
+        payment_ref = db.collection('payments').add(payment_data)
+        pusher.trigger(data.get('conversation_id'),'paiements','new-payment')
+
+        db.collection('conversations').document(data.get('conversation_id')).update({'payment_id':payment_ref[1].id})
+        return JsonResponse({'message': 'Payment created successfully','payment_id':payment_ref[1].id}, status=201)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# API view for retrieving a payment document
+@api_view(['GET'])
+@csrf_exempt
+def retrieve_payment(request, payment_id):
+    if request.method == 'GET':
+        # Retrieve payment document from Firestore
+        data = request.data.copy()
+        payment = db.collection('payments').document(payment_id).get().to_dict()
+        
+        if payment:
+            return JsonResponse(payment)
+        else:
+            return JsonResponse({'error': 'Payment not found'}, status=404)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# API view for deleting a payment document
+@api_view(['DELETE'])
+@csrf_exempt
+def delete_payment(request, payment_id,conversation_id):
+    if request.method == 'DELETE':
+        # Delete payment document from Firestore
+        data = request.data.copy()
+        payment_ref = db.collection('payments').document(payment_id).delete()
+        db.collection('conversations').document(conversation_id).update({'payment_id':firestore.DELETE_FIELD})
+        pusher.trigger(conversation_id,'cancel payment','new-payment')
+
+        return JsonResponse({'message': 'Payment deleted successfully'})
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+# API view for updating a payment document
+@api_view(['PUT'])
+@csrf_exempt
+def update_payment(request, payment_id,conversation_id):
+    if request.method == 'PUT':
+        # Extract data from request
+        data = request.POST
+        # Example data: {'amount': '200', 'description': 'Updated payment'}
+        
+        # Update payment document in Firestore
+        payment_ref = db.collection('payments').document(payment_id)
+        payment_ref.update({
+            'time' : timezone.now(),
+            'paid' : True
+        })
+        pusher.trigger(conversation_id,'paiements','new-payment')
+        return JsonResponse({'message': 'Payment updated successfully'})
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@api_view(['POST'])
+@csrf_exempt
+def save_feedback(request):
+    if request.method == 'POST':
+        try:
+            data = request.data.copy()
+            
+            feedback_data = {
+                'star': data.get('star'),
+                'comment': data.get('comment'),
+                'client_id': data.get('client_id'),
+                'company_id': data.get('company_id'),
+                'timestamp': timezone.now()}
+
+            # Save feedback to Firestore
+            if(data.get('feedback_id') == ''):
+                feedback_ref = db.collection('feedback').add(feedback_data)
+                feedback_id = feedback_ref[1].id
+                db.collection('feedback').document(feedback_id).update({'id': feedback_id})
+            else:
+                feedback_id = data.get('feedback_id')
+                db.collection('feedback').document(feedback_id).update(feedback_data)
+            return JsonResponse({'message': 'Feedback saved successfully'}, status=201)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@api_view(['GET'])
+@csrf_exempt
+def retrieve_feedback(request):
+    try:
+        client_id = request.query_params.get('client_id', None)
+        company_id = request.query_params.get('company_id', None)
+
+        
+        if client_id and company_id:
+            # Fetch feedback for a specific user
+            feedback_ref = db.collection('feedback').where('company_id', '==', company_id).where('client_id','==',client_id)
+        elif company_id :
+            feedback_ref = db.collection('feedback').where('company_id', '==', company_id)
+
+        
+        feedback = [fb.to_dict() for fb in feedback_ref.stream()]
+
+        return JsonResponse(feedback, safe=False, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

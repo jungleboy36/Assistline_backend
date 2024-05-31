@@ -17,7 +17,7 @@ class DemandesSerializer(serializers.HyperlinkedModelSerializer):
     # specify model and fields
     class Meta:
         model = Demande
-        fields = ('title', 'description','creationDate','updateDate','user_id','date','depart','destination','volume','price')
+        fields = ('title', 'description','creationDate','updateDate','user_id','date','depart','destination','price')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates
