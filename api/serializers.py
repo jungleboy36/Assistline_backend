@@ -7,7 +7,7 @@ class OffresSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Offre
         fields = ('title', 'description', 'creationDate', 'updateDate', 'user_id',
-                  'depart_date', 'arrival_date', 'itinerary', 'volume', 'price',)
+                  'depart_date', 'arrival_date','origin','destination','originMap','destinationMap','route') 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Set partial=True to allow partial updates

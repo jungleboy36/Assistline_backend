@@ -7,11 +7,13 @@ class Offre(models.Model):
 	creationDate = models.DateTimeField(auto_now_add=True)
 	updateDate = models.DateTimeField(auto_now=True) 
 	user_id = models.TextField()
-	depart_date = models.DateTimeField(null=True, blank=True)
-	arrival_date = models.DateTimeField(null=True, blank=True)
-	itinerary =	models.TextField()
-	volume = models.FloatField()
-	price = models.FloatField()
+	depart_date = models.TextField(null=True, blank=True)
+	arrival_date = models.TextField(null=True, blank=True)
+	origin = models.TextField(null=True,blank=True) 
+	destination = models.TextField(null=True,blank=True)
+	originMap = models.TextField(null=True,blank=True) 
+	destinationMap = models.TextField(null=True,blank=True)
+	route =  models.TextField(null=True,blank=True)
 	def __str__(self):
 		return self.title
 
@@ -21,7 +23,7 @@ class Demande(models.Model):
 	description = models.TextField()
 	creationDate = models.DateTimeField(auto_now_add=True)
 	updateDate = models.DateTimeField(auto_now=True) 
-	date = models.DateTimeField(null=True, blank=True)
+	date = models.TextField(null=True, blank=True)
 	depart = models.TextField()
 	destination = models.TextField()
 	volume = models.FloatField()

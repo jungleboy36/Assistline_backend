@@ -116,7 +116,7 @@ class OffresViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             data = serializer.validated_data
             data['creationDate'] = timezone.now()
-            firestore.client().collection('offres').add(data)
+            ref = firestore.client().collection('offres').add(data)
             notification_message = f'Nouvelle offre ajouté: {data["title"]}'
                 # Save the notification to the 'notifications' collection in Firestore
             notification_data = {
@@ -132,7 +132,10 @@ class OffresViewSet(viewsets.ViewSet):
             for client in clients:
                 client_ref = firestore.client().collection('users').document(client.id)
                 client_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+                pusher.trigger("offers","new-offer",ref[1].id)
+                resp = serializer.data
+                resp['id'] = ref[1].id
+            return Response(resp, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['company'])
     def update(self, request, pk=None):
