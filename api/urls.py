@@ -45,6 +45,9 @@ urlpatterns = [
 	path('delete_payment/<str:payment_id>/<str:conversation_id>/',delete_payment,name='delete_payment'),
 	path('save_feedback/',save_feedback,name='save_feedback'),
 	path('retrieve_feedback/',retrieve_feedback,name='retrieve_feedback'),
+	path('delete_report/<str:feedback_id>/',delete_report,name='delete_report'),
+	path('save_report/',save_report,name='save_report'),
+	path('get_reports/',get_reports,name='get_reports')
 
 
 

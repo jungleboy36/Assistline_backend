@@ -1016,6 +1016,7 @@ def save_feedback(request):
                 'comment': data.get('comment'),
                 'client_id': data.get('client_id'),
                 'company_id': data.get('company_id'),
+                'flagged': data.get('flagged'),
                 'timestamp': timezone.now()}
 
             # Save feedback to Firestore
@@ -1038,17 +1039,82 @@ def retrieve_feedback(request):
     try:
         client_id = request.query_params.get('client_id', None)
         company_id = request.query_params.get('company_id', None)
-
         
-        if client_id and company_id:
+        
+        if client_id is not None:
             # Fetch feedback for a specific user
             feedback_ref = db.collection('feedback').where('company_id', '==', company_id).where('client_id','==',client_id)
-        elif company_id :
+            print("client")
+        elif company_id is not None :
             feedback_ref = db.collection('feedback').where('company_id', '==', company_id)
+            print("feedback_ref: ",feedback_ref)
 
         
         feedback = [fb.to_dict() for fb in feedback_ref.stream()]
+        print('**feedbacks: ', feedback)
+        if not client_id:
+            # Fetch all clients data
+            clients_ref = db.collection('users').where('role','==','client')
+            clients = {client.id: client.to_dict() for client in clients_ref.stream()}
 
+            for fb in feedback:
+                client_data = clients.get(fb.get('client_id'))
+                if client_data:
+                    fb['client_image'] = client_data.get('image')
+                    fb['client_display_name'] = client_data.get('name')
         return JsonResponse(feedback, safe=False, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@csrf_exempt
+def save_report(request):
+    
+    data = request.data.copy()
+    db.collection('feedback').document(data.get('feedback_id')).update({'flagged':True})
+    return JsonResponse({'message': 'Feedback flagged successfully'}, status=200)
+
+@api_view(['GET'])
+@csrf_exempt
+def get_reports(request):
+    try:
+        feedback_ref = db.collection('feedback').where('flagged', '==', True)
+        feedbacks = [fb.to_dict() for fb in feedback_ref.stream()]
+
+        for feedback in feedbacks:
+            # Fetch client email
+            client_id = feedback.get('client_id')
+            if client_id:
+                client_ref = db.collection('users').document(client_id)
+                client_doc = client_ref.get()
+                if client_doc.exists:
+                    client_data = client_doc.to_dict()
+                    feedback['client_email'] = client_data.get('email')
+                else:
+                    feedback['client_email'] = None
+
+            # Fetch company email
+            company_id = feedback.get('company_id')
+            if company_id:
+                company_ref = db.collection('users').document(company_id)
+                company_doc = company_ref.get()
+                if company_doc.exists:
+                    company_data = company_doc.to_dict()
+                    feedback['company_email'] = company_data.get('email')
+                else:
+                    feedback['company_email'] = None
+
+        return JsonResponse(feedbacks, safe=False, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@csrf_exempt
+def delete_report(request, feedback_id):
+    if request.method == 'DELETE':
+        db.collection('feedback').document(feedback_id).delete()
+        return JsonResponse({'message': 'Feedback deleted successfully'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
