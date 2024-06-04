@@ -132,7 +132,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 import firebase_admin
 from firebase_admin import credentials
 
-cred = credentials.Certificate("marketplace\marketplace.json")
+cred = credentials.Certificate("marketplace/marketplace.json")
 firebase_admin.initialize_app(cred)
 
 
