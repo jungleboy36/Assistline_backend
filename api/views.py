@@ -13,7 +13,6 @@ import base64
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
-from rest_framework_jwt.settings import api_settings
 from rest_framework.permissions import IsAuthenticated
 import smtplib
 from email.mime.text import MIMEText
@@ -326,64 +325,6 @@ class RegisterViewSet(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-jwt_settings = api_settings.JWT_ENCODE_HANDLER
-
-class LoginAPIView(APIView):
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data['email']
-            password = serializer.validated_data['password']
-
-            try:
-                # Retrieve the user by email
-                user = auth.get_user_by_email(email)
-
-                # Check if the user exists
-                if not user:
-                    return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-                # Create a Firestore client
-                db = firestore.client()
-                # Retrieve the user's document in Firestore using the user's UID
-                user_doc = db.collection('users').document(user.uid).get()
-                id_token = firebase_authenticate(email, password)
-
-                # Verify if the user's account is enabled
-                if user_doc.exists:
-                    user_data = user_doc.to_dict()
-                    role = user_data.get('role')
-                    if not user_data.get('enabled', True):
-                        return Response({'error': 'Account disabled'}, status=status.HTTP_403_FORBIDDEN)
-
-                # Generate a JWT token containing user info and role
-                payload = {
-                    'uid': user.uid,
-                    'email': user.email,
-                    'role': role,
-                    'display_name': user.display_name,
-                    # Add other user attributes as needed
-                }
-                token = jwt_settings(payload)
-                print("*********** authenticated : "+ id_token)
-                if(is_user_verified(user.uid) and id_token):
-                    return Response({
-                        'message': 'Login successful',
-                        'token': token
-                    }, status=status.HTTP_200_OK)
-                elif(id_token) :
-                    return
-                elif(not is_user_verified(user.uid)) :
-                    return Response({'error': 'Email unverified'}, status=status.HTTP_403_FORBIDDEN)
-                elif (error_message):
-                    return Response({'error': 'Email ou mot de passe erroné'}, status=status.HTTP_403_FORBIDDEN)
-
-            except Exception as e:
-                # Handle any authentication errors
-                return Response({'error': 'Login failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            # Return serializer errors
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProfileView(APIView):
