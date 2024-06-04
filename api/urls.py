@@ -21,7 +21,6 @@ router.register(r'ad-api/clients', AdminClientsViewSet, basename='admin_clients'
 
 # specify URL Path for rest_framework
 urlpatterns = [
-	path('login/', LoginAPIView.as_view(), name='login'),
 	path('profile/', ProfileView.as_view(), name='user_profile'),
 	path('', include(router.urls)),
 	path('api-auth/', include('rest_framework.urls')),
