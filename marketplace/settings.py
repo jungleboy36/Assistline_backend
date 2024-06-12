@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-ku*hf!uua5+i99m7w()f&kwgsdpm0cm#yt&5*0&-nb%t+^xv(g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 
 
@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'api',
     'rest_framework',
     'corsheaders',
-    'rest_framework_jwt',
     'chat'
 ]
 

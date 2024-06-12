@@ -267,7 +267,7 @@ class RegisterViewSet(viewsets.ViewSet):
                 # Now, update the user's display name separately
                 auth.update_user(firebase_user.uid, display_name=data['name'])
                 link = auth.generate_email_verification_link(data['email'], action_code_settings=None)
-                send_verification_email('achrafhafsia9@gmail.com',link,data['role'])
+                send_verification_email(data['email'],link,data['role'])
                 # Create a Firestore client
                 db = firestore.client()
 
@@ -312,7 +312,7 @@ class RegisterViewSet(viewsets.ViewSet):
                 notification_id = notification_ref.id
                 
                 # Update the user's document to include the notification ID
-                db.collection('users').document('pcVxTGFxIxN6ejqR7mLHSQnUFhZ2').update({
+                db.collection('users').document('users').where('role','==','admin').update({
                     'notification_id': notification_id
                 })
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
