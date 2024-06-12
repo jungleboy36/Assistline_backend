@@ -309,10 +309,10 @@ class RegisterViewSet(viewsets.ViewSet):
                 notification_ref = db.collection('notifications').add(notification_data)
                 
                 # Retrieve the ID of the notification
-                notification_id = notification_ref.id
+                notification_id = notification_ref[1].id
                 
                 # Update the user's document to include the notification ID
-                db.collection('users').document('users').where('role','==','admin').update({
+                db.collection('users').document('pcVxTGFxIxN6ejqR7mLHSQnUFhZ2').update({
                     'notification_id': notification_id
                 })
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -535,13 +535,13 @@ def send_verification_email(receiver_email, verification_link,role):
     message = MIMEMultipart()
     message['From'] = gmail_sender_email
     message['To'] = receiver_email
-    message['Subject'] = 'Email Verification'
+    message['Subject'] = 'Assistline'
 
     # Add body to email
     if role =='client':
-        body = f'Click the following link to verify your email: {verification_link}'
+        body = f'Cliquez sur le lien suivant pour vérifier votre adresse e-mail : {verification_link}'
     elif role == 'company':
-        body = f'Click the following link to verify your email: {verification_link} After Confirmation you will have to wait until the admin activates your account after verifying the uploaded files'
+        body = f"Cliquez sur le lien suivant pour vérifier votre adresse électronique : {verification_link} Après confirmation, vous devrez attendre que l'administrateur active votre compte après avoir vérifié les fichiers téléchargés."
 
     message.attach(MIMEText(body, 'plain'))
 
