@@ -13,6 +13,7 @@ router = routers.DefaultRouter()
 router.register(r'offres', OffresViewSet, basename='offres')
 router.register(r'demandes', DemandesViewSet, basename='demandes')
 router.register(r'register',RegisterViewSet,basename='register')
+router.register(r'reset-password', PasswordResetViewSet, basename='reset-password')
 router.register(r'ad-api/companies', AdminCompaniesViewSet, basename='admin_companies'),
 router.register(r'ad-api/clients', AdminClientsViewSet, basename='admin_clients')
 

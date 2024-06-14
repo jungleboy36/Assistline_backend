@@ -325,6 +325,25 @@ class RegisterViewSet(viewsets.ViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class PasswordResetViewSet(viewsets.ViewSet):
+    def create(self, request, *args, **kwargs):
+        email = request.data.get('email')
+
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Generate a password reset link for the given email
+            reset_link = auth.generate_password_reset_link(email)
+            
+            # Optionally, send the reset link via email using your preferred method
+            send_verification_email(email, reset_link,'0')
+            
+            return Response({'message': 'Password reset link has been sent to your email.'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            # Handle any errors that occur during password reset link generation
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ProfileView(APIView):
@@ -522,7 +541,7 @@ class AdminClientsViewSet(viewsets.ViewSet):
         return Response(user_data, status=status.HTTP_200_OK)
 
 
-def send_verification_email(receiver_email, verification_link,role):
+def send_verification_email(receiver_email,link,role):
     # Set up the SMTP server
     smtp_server = 'smtp.gmail.com'
     smtp_port = 587  # For TLS
@@ -539,10 +558,12 @@ def send_verification_email(receiver_email, verification_link,role):
 
     # Add body to email
     if role =='client':
-        body = f'Cliquez sur le lien suivant pour vérifier votre adresse e-mail : {verification_link}'
+        body = f'Cliquez sur le lien suivant pour vérifier votre adresse e-mail : {link}'
     elif role == 'company':
-        body = f"Cliquez sur le lien suivant pour vérifier votre adresse électronique : {verification_link} Après confirmation, vous devrez attendre que l'administrateur active votre compte après avoir vérifié les fichiers téléchargés."
+        body = f"Cliquez sur le lien suivant pour vérifier votre adresse électronique : {link} Après confirmation, vous devrez attendre que l'administrateur active votre compte après avoir vérifié les fichiers téléchargés."
 
+    else:
+        body = f"Cliquez sur le lien suivant pour réinitialiser votre mot de passe : {link}"
     message.attach(MIMEText(body, 'plain'))
 
     # Create SMTP session
