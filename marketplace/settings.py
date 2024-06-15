@@ -137,6 +137,7 @@ firebase_admin.initialize_app(cred)
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:4200',
+    'http://frontend.a6dwddddhnhpdkgx.eastus.azurecontainer.io:4200'
       # Add the origin of your Angular application
     # Add other allowed origins as needed
 ]
