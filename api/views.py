@@ -641,16 +641,16 @@ class GetRoleFromToken(APIView):
 db = firestore.client()
 
             # Count the number of documents in the 'users' collection with role 'client'
-#client_count = len(list(db.collection('users').where('role', '==', 'client').where('enabled', '==', True).stream()))
+client_count = len(list(db.collection('users').where('role', '==', 'client').where('enabled', '==', True).stream()))
 
             # Count the number of documents in the 'users' collection with role 'company'
-#company_count = len(list(db.collection('users').where('role', '==', 'company').where('enabled', '==', True).stream()))
+company_count = len(list(db.collection('users').where('role', '==', 'company').where('enabled', '==', True).stream()))
 
             # Count the number of documents in the 'offres' collection
-#offres_count = len(list(db.collection('offres').stream()))
+offres_count = len(list(db.collection('offres').stream()))
 
             # Count the number of documents in the 'demandes' collection
-#demandes_count = len(list(db.collection('demandes').stream()))
+demandes_count = len(list(db.collection('demandes').stream()))
 
 
 class DocumentCountAPIView(APIView):
