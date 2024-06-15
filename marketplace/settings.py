@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-ku*hf!uua5+i99m7w()f&kwgsdpm0cm#yt&5*0&-nb%t+^xv(g
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-CORS_ALLOW_ALL_ORIGINS = True
+
 
 
 # Application definition
@@ -134,14 +134,8 @@ from firebase_admin import credentials
 cred = credentials.Certificate("marketplace/marketplace.json")
 firebase_admin.initialize_app(cred)
 
+CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:4200',
-    'http://frontend.a6dwddddhnhpdkgx.eastus.azurecontainer.io:4200'
-      # Add the origin of your Angular application
-    # Add other allowed origins as needed
-]
-CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies' ]
 
 PAYPAL_CLIENT_ID ='ARNVx6a5qIuRIhDkzuo2Uv7SnwOjsrX45p6HxwRV5Hh-JYmuP95loM1XXT8snKhcN4p9E-qdc87W0IS8'
 PAYPAL_CLIENT_SECRET='EDyy_2annU1GcqZtfr6PJRG6WgHy1ObQLL-IoLqKFDlfvesbql-Q2IAe0JXxxE0fiispr0XcBYLKsrhV'
