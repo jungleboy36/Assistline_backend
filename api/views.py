@@ -131,7 +131,7 @@ class OffresViewSet(viewsets.ViewSet):
             for client in clients:
                 client_ref = firestore.client().collection('users').document(client.id)
                 client_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
-                pusher.trigger("offers","new-offer",ref[1].id)
+                pusher.trigger("offers","update","")
                 resp = serializer.data
                 resp['id'] = ref[1].id
             return Response(resp, status=status.HTTP_201_CREATED)
@@ -143,6 +143,7 @@ class OffresViewSet(viewsets.ViewSet):
             data = serializer.validated_data
             data['updateDate'] = timezone.now()
             firestore.client().collection('offres').document(pk).set(data, merge=True)
+            pusher.trigger("offers","update","")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['company'])
@@ -151,6 +152,7 @@ class OffresViewSet(viewsets.ViewSet):
     @requires_role(['company'])
     def destroy(self, request, pk=None):
         firestore.client().collection('offres').document(pk).delete()
+        pusher.trigger("offers","update","")
         return Response(status=status.HTTP_200_OK)
     def retrieve(self, request, pk=None):
         offre = firestore.client().collection('offres').document(pk).get()
@@ -519,10 +521,10 @@ class AdminClientsViewSet(viewsets.ViewSet):
         print(user['email'])
         username = user["name"]
         if enabled :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été activé.')
 
         else :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été activé.')
+            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
@@ -1036,6 +1038,14 @@ def save_report(request):
     data = request.data.copy()
     db.collection('feedback').document(data.get('feedback_id')).update({'flagged':True})
     return JsonResponse({'message': 'Feedback flagged successfully'}, status=200)
+
+@api_view(['POST'])
+@csrf_exempt
+def ignore_report(request):
+    
+    data = request.data.copy()
+    db.collection('feedback').document(data.get('feedback_id')).update({'flagged':False})
+    return JsonResponse({'message': 'Feedback ignored successfully'}, status=200)
 
 @api_view(['GET'])
 @csrf_exempt

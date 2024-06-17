@@ -47,7 +47,9 @@ urlpatterns = [
 	path('retrieve_feedback/',retrieve_feedback,name='retrieve_feedback'),
 	path('delete_report/<str:feedback_id>/',delete_report,name='delete_report'),
 	path('save_report/',save_report,name='save_report'),
-	path('get_reports/',get_reports,name='get_reports')
+	path('get_reports/',get_reports,name='get_reports'),
+	path('ignore_report/',ignore_report,name='ignore_report'),
+
 
 
 
