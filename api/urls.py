@@ -14,8 +14,8 @@ router.register(r'offres', OffresViewSet, basename='offres')
 router.register(r'demandes', DemandesViewSet, basename='demandes')
 router.register(r'register',RegisterViewSet,basename='register')
 router.register(r'reset-password', PasswordResetViewSet, basename='reset-password')
-router.register(r'ad-api/companies', AdminCompaniesViewSet, basename='admin_companies'),
-router.register(r'ad-api/clients', AdminClientsViewSet, basename='admin_clients')
+router.register(r'companies', AdminCompaniesViewSet, basename='admin_companies'),
+router.register(r'clients', AdminClientsViewSet, basename='admin_clients')
 
 
 
@@ -25,7 +25,7 @@ urlpatterns = [
 	path('profile/', ProfileView.as_view(), name='user_profile'),
 	path('', include(router.urls)),
 	path('api-auth/', include('rest_framework.urls')),
-	path('ad-api/companies/<str:pk>/download-file/', download_file, name='download_file'),
+	path('companies/<str:pk>/download-file/', download_file, name='download_file'),
 	path('get-role/<str:id_token>/', GetRoleFromToken.as_view(), name='get-role'),
 	path('status/<str:pk>/',check_status, name='check_status'),
 	path('stats', DocumentCountAPIView.as_view(), name='document_count_api'),
@@ -49,6 +49,7 @@ urlpatterns = [
 	path('save_report/',save_report,name='save_report'),
 	path('get_reports/',get_reports,name='get_reports'),
 	path('ignore_report/',ignore_report,name='ignore_report'),
+	path('dashboard/',dashboard,name='dashboard'),
 
 
 

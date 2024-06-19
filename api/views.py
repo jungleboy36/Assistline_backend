@@ -26,7 +26,7 @@ from django.http import JsonResponse
 from django.core.serializers.json import DjangoJSONEncoder
 import paypalrestsdk
 from pusher import Pusher
-
+from datetime import datetime, timedelta
 
 
 def requires_role(allowed_roles):
@@ -131,9 +131,10 @@ class OffresViewSet(viewsets.ViewSet):
             for client in clients:
                 client_ref = firestore.client().collection('users').document(client.id)
                 client_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
-                pusher.trigger("offers","update","")
+                
                 resp = serializer.data
                 resp['id'] = ref[1].id
+            pusher.trigger("offers","update","")
             return Response(resp, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['company'])
@@ -217,6 +218,7 @@ class DemandesViewSet(viewsets.ViewSet):
             for company in companies:
                 company_ref = firestore.client().collection('users').document(company.id)
                 company_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
+                pusher.trigger("demandes","update","")
             return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['client', 'company'])
@@ -226,6 +228,7 @@ class DemandesViewSet(viewsets.ViewSet):
             data = offre.to_dict()
             user = firestore.client().collection('users').document(data.get('user_id')).get().to_dict()
             data['username'] = user['name']
+            pusher.trigger("demandes","update","")
             return Response(data,status=status.HTTP_200_OK)
         return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
     @requires_role(['client'])
@@ -235,6 +238,7 @@ class DemandesViewSet(viewsets.ViewSet):
             data = serializer.validated_data
             data['updateDate'] = timezone.now()
             firestore.client().collection('demandes').document(pk).set(data,merge= True)
+            pusher.trigger("demandes","update","")
             return Response(data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     @requires_role(['client'])
@@ -243,6 +247,7 @@ class DemandesViewSet(viewsets.ViewSet):
     @requires_role(['client'])
     def destroy(self, request, pk=None):
         firestore.client().collection('demandes').document(pk).delete()
+        pusher.trigger("demandes","update","")
         return Response(status=status.HTTP_200_OK)
 
 
@@ -345,7 +350,7 @@ class PasswordResetViewSet(viewsets.ViewSet):
 
         except Exception as e:
             # Handle any errors that occur during password reset link generation
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_200_OK)
 
 
 class ProfileView(APIView):
@@ -1090,3 +1095,53 @@ def delete_report(request, feedback_id):
         return JsonResponse({'message': 'Feedback deleted successfully'}, status=200)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@api_view(['GET'])
+@csrf_exempt
+def dashboard(request):
+    try:
+        payments = db.collection('payments').stream()
+        payment_list = []
+
+        for payment in payments:
+            payment_data = payment.to_dict()
+            receiver_id = payment_data['receiver_id']
+            sender_id = payment_data['sender_id']
+
+            # Fetch client details
+            client_ref = db.collection('users').document(receiver_id)
+            client = client_ref.get()
+            client_name = client.to_dict()['name'] if client.exists else 'Unknown Client'
+ 
+            # Fetch company details
+            company_ref = db.collection('users').document(sender_id)
+            company = company_ref.get()
+            company_name = company.to_dict()['name'] if company.exists else 'Unknown Company'
+
+            # Add client and company details to the payment data
+            payment_data['client_name'] = company_name
+            payment_data['company_name'] = client_name 
+
+            payment_list.append(payment_data)
+
+        users = db.collection('users').stream()
+        new_user_count = 0
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+
+        for user in users:
+            user_data = user.to_dict()
+            date_inscription = datetime.strptime(user_data['dateInscription'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            if date_inscription > thirty_days_ago:
+                new_user_count += 1
+        conversations_count = len(list(db.collection('conversations').stream()))
+        return JsonResponse({
+            'client_count': client_count,
+            'company_count': company_count,
+            'offres_count': offres_count,
+            'demandes_count': demandes_count,
+            'conversations_count' : conversations_count,
+            'payments': payment_list,
+            'new_users':new_user_count, 
+        }, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
