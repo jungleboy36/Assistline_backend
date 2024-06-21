@@ -1112,6 +1112,7 @@ def dashboard(request):
             client_ref = db.collection('users').document(receiver_id)
             client = client_ref.get()
             client_name = client.to_dict()['name'] if client.exists else 'Unknown Client'
+            company_image = client.to_dict()['image'] 
  
             # Fetch company details
             company_ref = db.collection('users').document(sender_id)
@@ -1121,15 +1122,22 @@ def dashboard(request):
             # Add client and company details to the payment data
             payment_data['client_name'] = company_name
             payment_data['company_name'] = client_name 
-
+            payment_data['company_image'] = company_image
             payment_list.append(payment_data)
 
         users = db.collection('users').stream()
         new_user_count = 0
+        clients = []
+        companies = []
         thirty_days_ago = datetime.now() - timedelta(days=30)
 
         for user in users:
             user_data = user.to_dict()
+            if 'role' in user_data:
+                if user_data['role'] == 'client':
+                    clients.append({'time':user_data['dateInscription']})
+                elif user_data['role'] == 'company':
+                    companies.append({'time':user_data['dateInscription']})
             date_inscription = datetime.strptime(user_data['dateInscription'], '%Y-%m-%dT%H:%M:%S.%fZ')
             if date_inscription > thirty_days_ago:
                 new_user_count += 1
@@ -1142,6 +1150,8 @@ def dashboard(request):
             'conversations_count' : conversations_count,
             'payments': payment_list,
             'new_users':new_user_count, 
+            'companies' : companies,
+            'clients' : clients,
         }, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
