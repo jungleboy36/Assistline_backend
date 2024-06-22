@@ -526,10 +526,10 @@ class AdminClientsViewSet(viewsets.ViewSet):
         print(user['email'])
         username = user["name"]
         if enabled :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été activé.')
+            send_email(user['email'],f'Bonjour {username}, nous vous informons que votre compte a été activé.')
 
         else :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
+            send_email(user['email'],f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
@@ -870,6 +870,7 @@ def create_conversation(request):
             conversation_data = {
                 'participants': [data.get("receiver_id"), data.get("sender_id")],
                 'time': timezone.now(),
+                'feedback_id': data.get('feedback_id'),
                 'display_names' : [data.get("receiver_display_name"),data.get("sender_display_name"),
                 ]
             }
@@ -989,7 +990,7 @@ def save_feedback(request):
                 'timestamp': timezone.now()}
 
             # Save feedback to Firestore
-            if(data.get('feedback_id') == ''):
+            if(data.get('feedback_id') == 'none'):
                 feedback_ref = db.collection('feedback').add(feedback_data)
                 feedback_id = feedback_ref[1].id
                 db.collection('feedback').document(feedback_id).update({'id': feedback_id})
