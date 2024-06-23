@@ -297,14 +297,17 @@ class RegisterViewSet(viewsets.ViewSet):
                     user_data['file'] = data['file']
                 if data['role'] == 'company' :
                     user_data['enabled'] = False
+                    notification_message = f'nouvelle société enregistrée: {data["name"]}'
+
                 else :
                     user_data['enabled'] = True
+                    notification_message = f'nouveau client inscrit: {data["name"]}'
                 # Save the user data in Firestore under the 'users' collection with the user's UID as the document ID
                 db.collection('users').document(uid).set(user_data)
                 
                 # Return a successful response with the serialized data and a status code of 201_CREATED
             
-                notification_message = f'New {role} registered: {data["name"]}'
+                
                 # Save the notification to the 'notifications' collection in Firestore
                 notification_data = {
                       # Replace with admin user ID
@@ -319,9 +322,7 @@ class RegisterViewSet(viewsets.ViewSet):
                 notification_id = notification_ref[1].id
                 
                 # Update the user's document to include the notification ID
-                db.collection('users').document('pcVxTGFxIxN6ejqR7mLHSQnUFhZ2').update({
-                    'notification_id': notification_id
-                })
+                db.collection('users').document('pcVxTGFxIxN6ejqR7mLHSQnUFhZ2').update({'notifications': firestore.ArrayUnion([notification_id])})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
             except Exception as e:
