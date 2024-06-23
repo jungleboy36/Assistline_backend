@@ -289,7 +289,8 @@ class RegisterViewSet(viewsets.ViewSet):
                     'dateInscription': data['dateInscription'],
                     'bio': data.get('bio'),
                     'city': data.get('city'),
-                    'image': data.get('image')
+                    'image': data.get('image'),
+                    'hideEmail': False,
                 })
                 user_data.pop('password')
                 # Include the Base64 encoded file in the user data if provided
@@ -434,10 +435,10 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
         print(user['email'])
         username = user['name']
         if enabled :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username},\nnous vous informons que votre compte a été désactivé.')
+            send_email(user['email'],f'Bonjour {username},\nnous vous informons que votre compte a été activé.')
 
         else :
-            send_email('achrafhafsia9@gmail.com',f'Bonjour {username},\nnous vous informons que votre compte a été activé.')
+            send_email(user['email'],f'Bonjour {username},\nnous vous informons que votre compte a été desactivé.')
 
 
         # Return a successful response
