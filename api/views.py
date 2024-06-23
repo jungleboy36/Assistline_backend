@@ -1144,6 +1144,7 @@ def dashboard(request):
             if date_inscription > thirty_days_ago:
                 new_user_count += 1
         conversations_count = len(list(db.collection('conversations').stream()))
+        reports = len(list(db.collection('feedback').where('flagged','==',True).stream()))
         return JsonResponse({
             'client_count': client_count,
             'company_count': company_count,
@@ -1154,6 +1155,7 @@ def dashboard(request):
             'new_users':new_user_count, 
             'companies' : companies,
             'clients' : clients,
+            'reports' : reports,
         }, status=200)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
