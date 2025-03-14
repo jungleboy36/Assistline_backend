@@ -81,8 +81,15 @@ WSGI_APPLICATION = 'marketplace.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'demelo',  # Change this to your MySQL database name
+        'USER': 'root',  # Change this to your MySQL username
+        'PASSWORD': '',  # Change this to your MySQL password
+        'HOST': '127.0.0.1',  # Change if MySQL is running on another server
+        'PORT': '3306',
+        'OPTIONS': {
+            'charset': 'utf8mb4',  # Supports emojis and special characters
+        },
     }
 }
 
@@ -138,10 +145,13 @@ firebase_admin.initialize_app(cred)
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:4200',
     'http://frontend.a6dwddddhnhpdkgx.eastus.azurecontainer.io',
+    'https://ttqdwdn2-4200.euw.devtunnels.ms',
+
       # Add the origin of your Angular application
     # Add other allowed origins as needed
 ]
-CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies' ]
+CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies',    'https://ttqdwdn2-4200.euw.devtunnels.ms','https://ttqdwdn2-4200.euw.devtunnels.ms/'
+ ]
 
 PAYPAL_CLIENT_ID ='ARNVx6a5qIuRIhDkzuo2Uv7SnwOjsrX45p6HxwRV5Hh-JYmuP95loM1XXT8snKhcN4p9E-qdc87W0IS8'
 PAYPAL_CLIENT_SECRET='EDyy_2annU1GcqZtfr6PJRG6WgHy1ObQLL-IoLqKFDlfvesbql-Q2IAe0JXxxE0fiispr0XcBYLKsrhV'

@@ -27,7 +27,7 @@ urlpatterns = [
 	path('api-auth/', include('rest_framework.urls')),
 	path('companies/<str:pk>/download-file/', download_file, name='download_file'),
 	path('get-role/<str:id_token>/', GetRoleFromToken.as_view(), name='get-role'),
-	path('status/<str:pk>/',check_status, name='check_status'),
+	path('status/<str:pk>',check_status, name='check_status'),
 	path('stats', DocumentCountAPIView.as_view(), name='document_count_api'),
 	path('notifications/', NotificationsAPIView.as_view(), name='notifications_api'),
 	path('notifications/mark-all-as-read/',mark_all_as_read , name='mark_all_as_read'),

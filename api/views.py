@@ -80,91 +80,37 @@ def authenticate(request):
     return None, None  # Or return an error response indicating missing token
 
 
-class OffresViewSet(viewsets.ViewSet):
-        # Check if user_id is provided in the query parameters
+class OffresViewSet(viewsets.ModelViewSet):
+    queryset = Offre.objects.all()
+    serializer_class = OffreSerializer
+    #permission_classes = [IsAuthenticated]
+    
+    def perform_create(self, serializer):
+        serializer.save(user=User.objects.get(pk=self.request.data.get('user_id')))
+    
     def list(self, request):
-        #user_auth, role = authenticate(request)
-        # Check if user_id is provided in the query parameters
-        #if user_auth and role == 'client'or role =='company':
-            user_id = request.query_params.get('user_id')
-            if user_id:
-                # If user_id is provided, filter offers by user_id
-                offres = firestore.client().collection('offres').where('user_id', '==', user_id).get()
-            else:
-                # If user_id is not provided, list all offers
-                offres = firestore.client().collection('offres').get()
-            
-            data = []
-            user =[]
-            for doc in offres:
-                offer_data = doc.to_dict()
-                user_id = offer_data.get('user_id')
-                # Fetch user information based on user_id
-                if user_id is not None:
-                    user = firestore.client().collection('users').document(user_id).get().to_dict()
-                    # Add user information to offer data
-                    offer_data['username'] = user['name']
-                    offer_data['picture'] = user['image']
-                
-                data.append({'id': doc.id, **offer_data})
-            return Response(data)
+        offres = Offre.objects.all()  # Fetch the latest offers dynamically
+        serializer = self.serializer_class(offres, many=True)
+        return Response(serializer.data)
 
-    @requires_role(['company'])
-    def create(self, request):
-        serializer = OffresSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.validated_data
-            data['creationDate'] = timezone.now()
-            ref = firestore.client().collection('offres').add(data)
-            notification_message = f'Nouvelle offre ajouté: {data["title"]}'
-                # Save the notification to the 'notifications' collection in Firestore
-            notification_data = {
-                      # Replace with admin user ID
-                    'message': notification_message,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                }
-            notification_ref = firestore.client().collection('notifications').add(notification_data)
-            notification_id = notification_ref[1].id
-            
-            # Update users with role 'client' to add the notification ID to their notifications array
-            clients = firestore.client().collection('users').where('role', '==', 'client').get()
-            for client in clients:
-                client_ref = firestore.client().collection('users').document(client.id)
-                client_ref.update({'notifications': firestore.ArrayUnion([notification_id])})
-                
-                resp = serializer.data
-                resp['id'] = ref[1].id
-            pusher.trigger("offers","update","")
-            return Response(resp, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    @requires_role(['company'])
+    
+    def retrieve(self, request, pk=None):
+        offre = self.get_object()
+        serializer = self.serializer_class(offre)
+        return Response(serializer.data)
+    
     def update(self, request, pk=None):
-        serializer = OffresSerializer(data=request.data)
+        offre = self.get_object()
+        serializer = self.serializer_class(offre, data=request.data, partial=True)
         if serializer.is_valid():
-            data = serializer.validated_data
-            data['updateDate'] = timezone.now()
-            firestore.client().collection('offres').document(pk).set(data, merge=True)
-            pusher.trigger("offers","update","")
+            serializer.save(update_date=timezone.now()) 
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    @requires_role(['company'])
-    def partial_update(self, request, pk=None):
-        return self.update(request, pk)
-    @requires_role(['company'])
+    
     def destroy(self, request, pk=None):
-        firestore.client().collection('offres').document(pk).delete()
-        pusher.trigger("offers","update","")
-        return Response(status=status.HTTP_200_OK)
-    def retrieve(self, request, pk=None):
-        offre = firestore.client().collection('offres').document(pk).get()
-        if offre.exists:
-            data = offre.to_dict()
-            user = firestore.client().collection('users').document(data.get('user_id')).get().to_dict()
-            data['username'] = user['name']
-            return Response(data,status=status.HTTP_200_OK)
-        return Response({'error': 'Demand not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
+        offre = self.get_object()
+        offre.delete()
+        return Response({'message': 'Offre deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
 
 class DemandesViewSet(viewsets.ViewSet):
     serializer_class = DemandesSerializer
@@ -478,8 +424,11 @@ def download_file(request, pk=None):
 
         return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
+@csrf_exempt
 @api_view(['GET'])
 def check_status(request, pk=None):
+        print("********user presence id : ",pk)
+
         db = firestore.client()
         user_doc = db.collection('users').document(pk).get()
 
@@ -650,16 +599,16 @@ class GetRoleFromToken(APIView):
 db = firestore.client()
 
             # Count the number of documents in the 'users' collection with role 'client'
-client_count = len(list(db.collection('users').where('role', '==', 'client').where('enabled', '==', True).stream()))
+client_count = 50
 
             # Count the number of documents in the 'users' collection with role 'company'
-company_count = len(list(db.collection('users').where('role', '==', 'company').where('enabled', '==', True).stream()))
+company_count = 50
 
             # Count the number of documents in the 'offres' collection
-offres_count = len(list(db.collection('offres').stream()))
+offres_count = 100
 
             # Count the number of documents in the 'demandes' collection
-demandes_count = len(list(db.collection('demandes').stream()))
+demandes_count = 100
 
 
 class DocumentCountAPIView(APIView):
@@ -838,11 +787,13 @@ def create_message(request):
 def update_user_presence(request):
     data = request.data.copy()
     user = data.get('userId')
+    print("********user presence id : ",user)
     doc_ref = db.collection("users").document(user)
     doc_ref.update({'online':data.get('online')})
     pusher.trigger('users','status',{'userId':user})
     return Response({'message': 'User presence updated successfully'}, status=200)
 
+@csrf_exempt 
 @api_view(['GET'])
 def get_user_presence(request):
     userId = request.query_params.get('userId')
