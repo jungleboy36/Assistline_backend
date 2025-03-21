@@ -27,7 +27,15 @@ from django.core.serializers.json import DjangoJSONEncoder
 import paypalrestsdk
 from pusher import Pusher
 from datetime import datetime, timedelta
+from django.contrib.auth.hashers import check_password
+from django.contrib.sessions.models import Session
+import random
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils.timezone import now,timedelta
 
+def generate_otp():
+    return str(random.randint(100000, 999999))  # Generates a 6-digit OTP
 
 def requires_role(allowed_roles):
     def decorator(func):
@@ -52,33 +60,149 @@ pusher = Pusher(
 
 
 
-def authenticate(request):
-    try:
-        authorization_header = request.headers.get('Authorization')
-        if authorization_header and authorization_header.startswith('Bearer '):
-            # Extract the token from the Authorization header
-            id_token_encoded = authorization_header[len('Bearer '):]
-            
-            # Decode the Base64-encoded token
-            id_token_decoded = base64.b64decode(id_token_encoded).decode('utf-8')
-            
-            # Verify the decoded token with Firebase Authentication
-            decoded_token = auth.verify_id_token(id_token_decoded)
-            #print('Decoded token : ', decoded_token)
-            
-            user_id = decoded_token['uid']
-            role = firestore.client().collection('users').document(user_id).get().to_dict()
-            role = role['role']
-            print('Role : ', role)
-            
-            return user_id, role
-    except Exception as e:
-        print(f"Error verifying token in authorization header: {e}")
-        pass  # Continue checking for token in other sources
-    
-    # No valid token found
-    return None, None  # Or return an error response indicating missing token
+@csrf_exempt
+def login(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            email = data.get('email')
+            password = data.get('password')
 
+            user = User.objects.filter(email=email).first()
+
+            if user and check_password(password, user.password):
+                # Save session
+                request.session['user_id'] = user.id
+                request.session['email'] = user.email
+                request.session['role'] = user.role
+                return JsonResponse({"message": "Login successful", "user_id": user.id}, status=200)
+            else:
+                return JsonResponse({"error": "Invalid email or password"}, status=400)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+
+
+@csrf_exempt
+def register(request):
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            if User.objects.filter(email=data['email']).exists():
+                return JsonResponse({"error": "Email already exists"}, status=400)
+            otp = generate_otp()
+            # Create new user
+            user = User(
+                bio=data.get('bio', ''),
+                city=data.get('city', ''),
+                date_inscription=timezone.now(),
+                email=data['email'],
+                file=data.get('file', ''),
+                name=data.get('name', ''),
+                phone=data.get('phone', ''),
+                role=data.get('role', ''),
+                type_user=data.get('type_user', None),
+                statut_user=data.get('statut_user', None),
+                password=make_password(data['password']),
+                otp=otp,
+                otp_created_at=timezone.now(),
+                enabled=0,
+                emailVerified=0,
+                  # Hash the password
+            )
+            user.save()
+            send_mail(
+                "Code de vérification",
+                f"Votre code de vérification est : {otp}. Il expirera dans 5 minutes.",
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+            return JsonResponse({"message": "User registered successfully"}, status=201)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
+@api_view(['POST'])
+def verify_otp(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            print(data)
+            email = data.get("email")
+            otp = data.get("otp")
+
+            user = User.objects.filter(email=email).first()
+
+            if not user:
+                return JsonResponse({"error": "User not found"}, status=400)
+            if user.emailVerified:
+                return JsonResponse({"error": "User already verified"}, status=400)
+            # Check if OTP is valid and not expired (valid for 5 minutes)
+            if user.otp == otp and user.otp_created_at and now() - user.otp_created_at < timedelta(minutes=5):
+                user.is_verified = True 
+                user.emailVerified=1 # Mark user as verified
+                user.otp = None  # Remove OTP after verification
+                user.otp_created_at = None
+                user.save()
+                return JsonResponse({"message": "OTP verified successfully"}, status=200)
+            elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=1):
+                return JsonResponse({"message": "expired"}, status=400)
+            else:
+                return JsonResponse({"message": "invalid"}, status=400) 
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+
+@csrf_exempt
+def resend_otp(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            email = data.get("email")
+
+            user = User.objects.filter(email=email).first()
+            if not user:
+                return JsonResponse({"error": "Utilisateur introuvable."}, status=400)
+            if user.emailVerified:
+                return JsonResponse({"error": "User already verified"}, status=400)
+            # Generate a new OTP
+            new_otp = str(random.randint(100000, 999999))
+            user.otp = new_otp
+            user.otp_created_at = now()
+            user.save()
+
+            # Send new OTP via email
+            send_mail(
+                "Nouveau code de vérification",
+                f"Votre nouveau code de vérification est : {new_otp}. Il expirera dans 5 minutes.",
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+
+            return JsonResponse({"message": "Nouveau OTP envoyé avec succès."}, status=200)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+            
+def logout(request):
+    request.session.flush()  # Clears the session
+    return JsonResponse({"message": "Logout successful"}, status=200)
+
+def check_session(request):
+    if 'user_id' in request.session:
+        return JsonResponse({"message": "User is logged in", "user_id": request.session['user_id']}, status=200)
+    else:
+        return JsonResponse({"message": "User is not logged in"}, status=401)
+
+@api_view(['GET'])  
+def email_exists(request,email):
+    exists = User.objects.filter(email=email).exists()
+    return JsonResponse({"exists": exists}, status=200)
 
 class OffresViewSet(viewsets.ModelViewSet):
     queryset = Offre.objects.all()

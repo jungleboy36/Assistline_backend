@@ -12,7 +12,6 @@ router = routers.DefaultRouter()
 # define the router path and viewset to be used
 router.register(r'offres', OffresViewSet, basename='offres')
 router.register(r'demandes', DemandesViewSet, basename='demandes')
-router.register(r'register',RegisterViewSet,basename='register')
 router.register(r'reset-password', PasswordResetViewSet, basename='reset-password')
 router.register(r'companies', AdminCompaniesViewSet, basename='admin_companies'),
 router.register(r'clients', AdminClientsViewSet, basename='admin_clients')
@@ -50,6 +49,14 @@ urlpatterns = [
 	path('get_reports/',get_reports,name='get_reports'),
 	path('ignore_report/',ignore_report,name='ignore_report'),
 	path('dashboard/',dashboard,name='dashboard'),
+    path('register/', register, name="register"),
+    path('login/', login, name="login"),
+    path('logout/', logout, name="logout"),
+    path('check-session/', check_session, name="check_session"),
+	path('check_email/<str:email>',email_exists,name='email_exists'),
+	path("verify-otp/", verify_otp, name="verify_otp"),
+	path("resend-otp/", resend_otp, name="resend_otp"),
+
 
 
 

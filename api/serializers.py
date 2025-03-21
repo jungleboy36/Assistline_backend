@@ -5,12 +5,12 @@ from rest_framework import serializers
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'bio', 'city', 'date_inscription', 'email', 'file', 'name', 'phone', 'role', 'type_user', 'statut_user', 'login', 'password']
+        fields = ['id', 'bio', 'city', 'date_inscription', 'email', 'file', 'name', 'phone', 'role', 'type_user', 'statut_user', 'password', 'otp', 'otp_created_at', 'enabled', 'emailVerified']
         extra_kwargs = {'password': {'write_only': True}}
     
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        return user
+        validated_data['password'] = make_password(validated_data['password'])
+        return super().create(validated_data)
 
 class OffreSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

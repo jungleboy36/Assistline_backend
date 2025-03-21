@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
 
 
 
@@ -7,21 +8,36 @@ class User(models.Model):
     id = models.AutoField(primary_key=True)
     bio = models.TextField(null=True, blank=True)
     city = models.CharField(max_length=255, null=True, blank=True)
-    date_inscription = models.DateField(null=True, blank=True,db_column='dateInscription')
+    date_inscription = models.DateField(null=True, blank=True, db_column='dateInscription')
     email = models.EmailField(unique=True, max_length=255)
-    file = models.CharField(max_length=255, null=True, blank=True)
+    file = models.TextField(null=True, blank=True,db_column='file')
     name = models.CharField(max_length=255, null=True, blank=True)
     phone = models.CharField(max_length=255, null=True, blank=True)
     role = models.CharField(max_length=255, null=True, blank=True)
     type_user = models.IntegerField(null=True, blank=True)
     statut_user = models.IntegerField(null=True, blank=True)
-    login = models.CharField(max_length=255, unique=True)
-    password = models.CharField(max_length=255)
+    password = models.CharField(max_length=255)  # Store hashed passwords
+    otp = models.CharField(max_length=6, null=True, blank=True)
+    otp_created_at = models.DateTimeField(null=True, blank=True)
+    enabled = models.BooleanField(null=True, blank=True)
+    emailVerified = models.BooleanField(null=True, blank=True)
+
     class Meta:
         db_table = 'users'
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+
+    def generate_otp(self):
+        self.otp = str(random.randint(100000, 999999))
+        self.otp_created_at = now()
+        self.save()
+
     def __str__(self):
         return str(self.id)
-
 class Offre(models.Model):
     id_offre = models.AutoField(primary_key=True,db_column='id_offre')
     destination_date_start = models.DateField(null=True, blank=True,db_column='destinationDateStart')

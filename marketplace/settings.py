@@ -155,3 +155,20 @@ CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies',    'https://tt
 
 PAYPAL_CLIENT_ID ='ARNVx6a5qIuRIhDkzuo2Uv7SnwOjsrX45p6HxwRV5Hh-JYmuP95loM1XXT8snKhcN4p9E-qdc87W0IS8'
 PAYPAL_CLIENT_SECRET='EDyy_2annU1GcqZtfr6PJRG6WgHy1ObQLL-IoLqKFDlfvesbql-Q2IAe0JXxxE0fiispr0XcBYLKsrhV'
+
+SESSION_ENGINE = "django.contrib.sessions.backends.db"  # Stores sessions in DB
+SESSION_COOKIE_AGE = 86400  # 1-day session expiry
+SESSION_SAVE_EVERY_REQUEST = True  # Updates expiry on each request
+
+import environ
+
+env = environ.Env()
+environ.Env.read_env()  # Load environment variables from .env file
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env.int("EMAIL_PORT")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
