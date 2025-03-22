@@ -27,7 +27,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
-
+CORS_ALLOW_HEADERS = [
+    "content-type",
+    "X-CSRFToken",
+    "X-Requested-With",
+    "accept",
+    "origin",
+    "authorization",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
 
@@ -150,7 +158,7 @@ CORS_ALLOWED_ORIGINS = [
       # Add the origin of your Angular application
     # Add other allowed origins as needed
 ]
-CORS_ORIGIN_WHITELIST = ['https://localhost:400/admin/companies',    'https://ttqdwdn2-4200.euw.devtunnels.ms','https://ttqdwdn2-4200.euw.devtunnels.ms/'
+CORS_ORIGIN_WHITELIST = ['https://localhost:4200/admin/companies',    'https://localhost:4200/login/','https://ttqdwdn2-4200.euw.devtunnels.ms/'
  ]
 
 PAYPAL_CLIENT_ID ='ARNVx6a5qIuRIhDkzuo2Uv7SnwOjsrX45p6HxwRV5Hh-JYmuP95loM1XXT8snKhcN4p9E-qdc87W0IS8'
@@ -159,6 +167,9 @@ PAYPAL_CLIENT_SECRET='EDyy_2annU1GcqZtfr6PJRG6WgHy1ObQLL-IoLqKFDlfvesbql-Q2IAe0J
 SESSION_ENGINE = "django.contrib.sessions.backends.db"  # Stores sessions in DB
 SESSION_COOKIE_AGE = 86400  # 1-day session expiry
 SESSION_SAVE_EVERY_REQUEST = True  # Updates expiry on each request
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True  # ⚠️ Only works over HTTPS
+
 
 import environ
 

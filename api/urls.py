@@ -24,7 +24,6 @@ urlpatterns = [
 	path('profile/', ProfileView.as_view(), name='user_profile'),
 	path('', include(router.urls)),
 	path('api-auth/', include('rest_framework.urls')),
-	path('companies/<str:pk>/download-file/', download_file, name='download_file'),
 	path('get-role/<str:id_token>/', GetRoleFromToken.as_view(), name='get-role'),
 	path('status/<str:pk>',check_status, name='check_status'),
 	path('stats', DocumentCountAPIView.as_view(), name='document_count_api'),
@@ -50,12 +49,14 @@ urlpatterns = [
 	path('ignore_report/',ignore_report,name='ignore_report'),
 	path('dashboard/',dashboard,name='dashboard'),
     path('register/', register, name="register"),
-    path('login/', login, name="login"),
     path('logout/', logout, name="logout"),
     path('check-session/', check_session, name="check_session"),
 	path('check_email/<str:email>',email_exists,name='email_exists'),
 	path("verify-otp/", verify_otp, name="verify_otp"),
 	path("resend-otp/", resend_otp, name="resend_otp"),
+    path("login/", login, name="login"),
+	path('get-user/', get_user_info, name='get_user_info'),
+	path('canResend/<str:email>', canResend, name='canResend'),
 
 
 

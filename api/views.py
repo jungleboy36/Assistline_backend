@@ -60,28 +60,6 @@ pusher = Pusher(
 
 
 
-@csrf_exempt
-def login(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            email = data.get('email')
-            password = data.get('password')
-
-            user = User.objects.filter(email=email).first()
-
-            if user and check_password(password, user.password):
-                # Save session
-                request.session['user_id'] = user.id
-                request.session['email'] = user.email
-                request.session['role'] = user.role
-                return JsonResponse({"message": "Login successful", "user_id": user.id}, status=200)
-            else:
-                return JsonResponse({"error": "Invalid email or password"}, status=400)
-
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
-
 
 
 @csrf_exempt
@@ -101,7 +79,7 @@ def register(request):
                 file=data.get('file', ''),
                 name=data.get('name', ''),
                 phone=data.get('phone', ''),
-                role=data.get('role', ''),
+                role="user",
                 type_user=data.get('type_user', None),
                 statut_user=data.get('statut_user', None),
                 password=make_password(data['password']),
@@ -147,6 +125,13 @@ def verify_otp(request):
                 user.otp = None  # Remove OTP after verification
                 user.otp_created_at = None
                 user.save()
+                send_mail(
+                    "Email vérifié",
+                    f"Votre email a été vérifié avec succès.Veuillez patienter pendant que nous vérifions vos documents afin que vous puissiez vous connecter à notre plateforme.",
+                    settings.EMAIL_HOST_USER,
+                    [user.email],
+                    fail_silently=False,
+                )
                 return JsonResponse({"message": "OTP verified successfully"}, status=200)
             elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=1):
                 return JsonResponse({"message": "expired"}, status=400)
@@ -156,6 +141,23 @@ def verify_otp(request):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
 
+
+@csrf_exempt
+def canResend(request,email):
+    if request.method == "GET":
+        try:
+            user = User.objects.filter(email=email).first()
+            if not user:
+                return JsonResponse({"error": "User not found"}, status=400)
+            if user.emailVerified:
+                return JsonResponse({"error": "already verified"}, status=400)
+            if user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=5):
+                return JsonResponse({"resend": True}, status=200)
+            else:
+                return JsonResponse({"resend": False}, status=200) 
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
 
 @csrf_exempt
 def resend_otp(request):
@@ -170,6 +172,8 @@ def resend_otp(request):
             if user.emailVerified:
                 return JsonResponse({"error": "User already verified"}, status=400)
             # Generate a new OTP
+
+
             new_otp = str(random.randint(100000, 999999))
             user.otp = new_otp
             user.otp_created_at = now()
@@ -188,16 +192,75 @@ def resend_otp(request):
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
-            
+
+
+
+@csrf_exempt
+def login(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            email = data.get("email")
+            password = data.get("password")
+
+            user = User.objects.filter(email=email).first()
+
+            if not user:
+                return JsonResponse({"error": "Utilisateur non trouvé."}, status=404)
+
+            if not check_password(password, user.password):
+                return JsonResponse({"error": "Mot de passe incorrect."}, status=401)
+
+            # Set session
+            request.session['user_id'] = user.id
+            request.session['email'] = user.email
+            request.session['is_verified'] = user.emailVerified
+            request.session['role'] = user.role
+
+            return JsonResponse({
+                "message": "Connexion réussie",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "verified": user.emailVerified,
+                    "role": user.role,
+                    'enabled': user.enabled
+                }
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
 def logout(request):
     request.session.flush()  # Clears the session
     return JsonResponse({"message": "Logout successful"}, status=200)
 
 def check_session(request):
     if 'user_id' in request.session:
-        return JsonResponse({"message": "User is logged in", "user_id": request.session['user_id']}, status=200)
+        return JsonResponse({"message": "User is logged in", "user_id": request.session['user_id'],"role":request.session['role']}, status=200)
     else:
         return JsonResponse({"message": "User is not logged in"}, status=401)
+
+
+def get_user_info(request):
+    user_id = request.session.get('user_id')
+
+    if not user_id:
+        return JsonResponse({ "error": "Utilisateur non connecté." }, status=401)
+
+    try:
+        user = User.objects.get(id=user_id)
+        return JsonResponse({
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+        }, status=200)
+
+    except User.DoesNotExist:
+        return JsonResponse({ "error": "Utilisateur introuvable." }, status=404)
 
 @api_view(['GET'])  
 def email_exists(request,email):
@@ -210,7 +273,7 @@ class OffresViewSet(viewsets.ModelViewSet):
     #permission_classes = [IsAuthenticated]
     
     def perform_create(self, serializer):
-        serializer.save(user=User.objects.get(pk=self.request.data.get('user_id')))
+        serializer.save(user=User.objects.get(pk=self.request.session['user_id']))
     
     def list(self, request):
         offres = Offre.objects.all()  # Fetch the latest offers dynamically
@@ -474,79 +537,76 @@ class ProfileView(APIView):
 
 
 
+
 class AdminCompaniesViewSet(viewsets.ViewSet):
-    @requires_role(['admin'])
     def list(self, request):
-        # List all companies (users with 'company' role)
-        db = firestore.client()
-        users_ref = db.collection('users').where('role', '==', 'company')
-        companies = users_ref.stream()
+        # Get all verified users with role = 'company'
+        companies = User.objects.filter(role='user', emailVerified=1)  # Assuming 'statut_user' means verified
 
         company_list = []
         for company in companies:
-            if(is_user_verified(company.id)):
-                company_data = company.to_dict()
-                company_data['uid'] = company.id
-                company_list.append(company_data)
+            company_data = {
+                'id': company.id,
+                'name': company.name,
+                'email': company.email,
+                'enabled': bool(company.enabled),
+                'dateInscription': company.date_inscription,
+
+                'file': company.file,
+            }
+            company_list.append(company_data)
 
         return Response(company_list, status=status.HTTP_200_OK)
-    @requires_role(['admin'])
+
     def update(self, request, pk=None):
-        # Update the user's account enabled/disabled status
         enabled = request.data.get('enabled')
         if enabled is None:
             return Response({'error': 'Missing "enabled" parameter'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Update the user's 'enabled' field in Firestore
-        db = firestore.client()
-        user_doc = db.collection('users').document(pk)
-        user_doc.update({'enabled': enabled})
-        user = db.collection('users').document(pk).get().to_dict()
-        print(user['email'])
-        username = user['name']
-        if enabled :
-            send_email(user['email'],f'Bonjour {username},\nnous vous informons que votre compte a été activé.')
+        try:
+            user = User.objects.get(id=pk, role='user')
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        else :
-            send_email(user['email'],f'Bonjour {username},\nnous vous informons que votre compte a été desactivé.')
+        user.enabled = 1 if enabled else 0
+        user.save()
 
+        message = (
+            f"Bonjour {user.name},\nVotre compte est maintenant actif et vous pouvez vous connecter à notre plateforme."
+            if enabled else
+            f"Bonjour {user.name},\nnous vous informons que votre compte a été désactivé."
+        )
+        send_mail(
+            subject='Compte activé' if enabled else 'Compte désactivé',
+            from_email=settings.DEFAULT_FROM_EMAIL,  # ✅ Required
+            message=message,
+            recipient_list=[user.email],
+            fail_silently=False  # Optional, good for debugging
 
-        # Return a successful response
+        )
+
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
+
     @requires_role(['admin'])
     def retrieve(self, request, pk=None):
-        # Retrieve user details and file URL
-        db = firestore.client()
-        user_doc = db.collection('users').document(pk).get()
-
-        if not user_doc.exists:
+        try:
+            user = User.objects.get(pk=pk, role='company')
+        except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        user_data = user_doc.to_dict()
+        user_data = {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'enabled': bool(user.statut_user),
+            'city': user.city,
+            'phone': user.phone,
+            'role': user.role,
+            'file': user.file,
+        }
 
-        # Return the user data
         return Response(user_data, status=status.HTTP_200_OK)
 
-@api_view(['GET'])
-def download_file(request, pk=None):
-    
-        # Retrieve the user's file URL and download the file
-        db = firestore.client()
-        user_doc = db.collection('users').document(pk).get()
-
-        if not user_doc.exists:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        user_data = user_doc.to_dict()
-        file_url = user_data.get('file')
-
-        if not file_url:
-            return Response({'error': 'No file available'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Download and return the file
-        # Implement the logic to download the file using file_url and send it as a response
-
-        return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
 @csrf_exempt
 @api_view(['GET'])
