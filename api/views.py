@@ -214,7 +214,7 @@ def login(request):
             # Set session
             request.session['user_id'] = user.id
             request.session['email'] = user.email
-            request.session['is_verified'] = user.emailVerified
+            request.session['verified'] = user.emailVerified
             request.session['role'] = user.role
 
             return JsonResponse({
