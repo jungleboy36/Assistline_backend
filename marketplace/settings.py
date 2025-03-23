@@ -168,7 +168,7 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"  # Stores sessions in DB
 SESSION_COOKIE_AGE = 86400  # 1-day session expiry
 SESSION_SAVE_EVERY_REQUEST = True  # Updates expiry on each request
 SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True  # ⚠️ Only works over HTTPS
+SESSION_COOKIE_SECURE = False # ⚠️ Only works over HTTPS
 
 
 import environ
