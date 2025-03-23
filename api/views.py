@@ -273,7 +273,7 @@ class OffresViewSet(viewsets.ModelViewSet):
     #permission_classes = [IsAuthenticated]
     
     def perform_create(self, serializer):
-        serializer.save(user=User.objects.get(pk=self.request.session['user_id']))
+        serializer.save(user=User.objects.get(pk=self.request.session['user_id']),user_id=self.request.session['user_id'])
     
     def list(self, request):
         offres = Offre.objects.all()  # Fetch the latest offers dynamically
