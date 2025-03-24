@@ -33,6 +33,7 @@ import random
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now,timedelta
+import threading
 
 def generate_otp():
     return str(random.randint(100000, 999999))  # Generates a 6-digit OTP
@@ -59,7 +60,14 @@ pusher = Pusher(
                 )
 
 
-
+def send_verification_email(email, otp):
+    send_mail(
+        "Code de vérification",
+        f"Votre code de vérification est : {otp}. Il expirera dans 5 minutes.",
+        settings.EMAIL_HOST_USER,
+        [email],
+        fail_silently=False,
+    )
 
 
 @csrf_exempt
@@ -91,13 +99,8 @@ def register(request):
                   # Hash the password
             )
             user.save()
-            send_mail(
-                "Code de vérification",
-                f"Votre code de vérification est : {otp}. Il expirera dans 5 minutes.",
-                settings.EMAIL_HOST_USER,
-                [user.email],
-                fail_silently=True,
-            )
+            threading.Thread(target=send_verification_email, args=(user.email, otp)).start()
+
             return JsonResponse({"message": "User registered successfully"}, status=201)
 
         except Exception as e:
@@ -179,7 +182,7 @@ def resend_otp(request):
             user.otp = new_otp
             user.otp_created_at = now()
             user.save()
-
+            
             # Send new OTP via email
             send_mail(
                 "Nouveau code de vérification",
@@ -188,7 +191,7 @@ def resend_otp(request):
                 [user.email],
                 fail_silently=False,
             )
-
+            
             return JsonResponse({"message": "Nouveau OTP envoyé avec succès."}, status=200)
 
         except Exception as e:
