@@ -16,6 +16,10 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+import environ
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -147,7 +151,7 @@ import firebase_admin
 from firebase_admin import credentials
 
 cred = credentials.Certificate("marketplace/marketplace.json")
-#firebase_admin.initialize_app(cred)
+firebase_admin.initialize_app(cred)
 
 
 CORS_ALLOWED_ORIGINS = [
@@ -170,11 +174,7 @@ SESSION_SAVE_EVERY_REQUEST = True  # Updates expiry on each request
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
 
-
-import environ
-
-env = environ.Env()
-environ.Env.read_env()  # Load environment variables from .env file
+ # Load environment variables from .env file
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = env("EMAIL_HOST")
