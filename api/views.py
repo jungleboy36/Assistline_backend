@@ -424,7 +424,6 @@ class RegisterViewSet(viewsets.ViewSet):
                 # Now, update the user's display name separately
                 auth.update_user(firebase_user.uid, display_name=data['name'])
                 link = auth.generate_email_verification_link(data['email'], action_code_settings=None)
-                send_verification_email(data['email'],link,data['role'])
                 # Create a Firestore client
                 db = firestore.client()
 
@@ -496,7 +495,6 @@ class PasswordResetViewSet(viewsets.ViewSet):
             reset_link = auth.generate_password_reset_link(email)
             
             # Optionally, send the reset link via email using your preferred method
-            send_verification_email(email, reset_link,'0')
             
             return Response({'message': 'Password reset link has been sent to your email.'}, status=status.HTTP_200_OK)
 
@@ -698,40 +696,6 @@ class AdminClientsViewSet(viewsets.ViewSet):
 
         # Return the user data
         return Response(user_data, status=status.HTTP_200_OK)
-
-
-def send_verification_email(receiver_email,link,role):
-    # Set up the SMTP server
-    smtp_server = 'smtp.gmail.com'
-    smtp_port = 587  # For TLS
-
-    # Your Gmail credentials
-    gmail_sender_email = 'achrafhafsia36@gmail.com'
-    gmail_app_password = 'zuhm ourh kjug jnkk'
-
-    # Create a message
-    message = MIMEMultipart()
-    message['From'] = gmail_sender_email
-    message['To'] = receiver_email
-    message['Subject'] = 'Assistline'
-
-    # Add body to email
-    if role =='client':
-        body = f'Cliquez sur le lien suivant pour vérifier votre adresse e-mail : {link}'
-    elif role == 'company':
-        body = f"Cliquez sur le lien suivant pour vérifier votre adresse électronique : {link} Après confirmation, vous devrez attendre que l'administrateur active votre compte après avoir vérifié les fichiers téléchargés."
-
-    else:
-        body = f"Cliquez sur le lien suivant pour réinitialiser votre mot de passe : {link}"
-    message.attach(MIMEText(body, 'plain'))
-
-    # Create SMTP session
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()  # Enable TLS
-        server.login(gmail_sender_email, gmail_app_password)
-        server.sendmail(gmail_sender_email, receiver_email, message.as_string())
-
-#send_verification_email('achrafhafsia9@gmail.com','test')
 
 
 def send_email(receiver_email, body):
