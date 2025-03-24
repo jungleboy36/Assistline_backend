@@ -240,11 +240,16 @@ def logout(request):
 
 def check_session(request):
     if 'user_id' in request.session:
-        return JsonResponse({"message": "User is logged in","session":request.session}, status=200)
+        return JsonResponse({
+            "message": "User is logged in",
+            "user_id": request.session.get("user_id"),
+            "email": request.session.get("email"),
+            "role": request.session.get("role"),
+            "verified": request.session.get("is_verified"),
+            "enabled": request.session.get("enabled", True)  # optional fallback
+        }, status=200)
     else:
         return JsonResponse({"message": "User is not logged in"}, status=401)
-
-
 def get_user_info(request):
     user_id = request.session.get('user_id')
 
