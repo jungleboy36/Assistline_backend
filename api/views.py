@@ -69,6 +69,23 @@ def send_verification_email(email, otp):
         fail_silently=False,
     )
 
+def send_success_verification_email(email):
+    send_mail(
+        "Email vérifié",
+        "Votre email a été vérifié avec succès. Veuillez patienter pendant que nous vérifions vos documents afin que vous puissiez vous connecter à notre plateforme.",
+        settings.EMAIL_HOST_USER,
+        [email],
+        fail_silently=False,
+    )
+
+def send_resend_otp_email(email, otp):
+    send_mail(
+        "Nouveau code de vérification",
+        f"Votre nouveau code de vérification est : {otp}. Il expirera dans 5 minutes.",
+        settings.EMAIL_HOST_USER,
+        [email],
+        fail_silently=False,
+    )
 
 @csrf_exempt
 def register(request):
@@ -129,13 +146,8 @@ def verify_otp(request):
                 user.otp = None  # Remove OTP after verification
                 user.otp_created_at = None
                 user.save()
-                send_mail(
-                    "Email vérifié",
-                    f"Votre email a été vérifié avec succès.Veuillez patienter pendant que nous vérifions vos documents afin que vous puissiez vous connecter à notre plateforme.",
-                    settings.EMAIL_HOST_USER,
-                    [user.email],
-                    fail_silently=False,
-                )
+                threading.Thread(target=send_success_verification_email, args=(user.email,)).start()
+
                 return JsonResponse({"message": "OTP verified successfully"}, status=200)
             elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=1):
                 return JsonResponse({"message": "expired"}, status=400)
@@ -184,14 +196,9 @@ def resend_otp(request):
             user.save()
             
             # Send new OTP via email
-            send_mail(
-                "Nouveau code de vérification",
-                f"Votre nouveau code de vérification est : {new_otp}. Il expirera dans 5 minutes.",
-                settings.EMAIL_HOST_USER,
-                [user.email],
-                fail_silently=False,
-            )
-            
+            threading.Thread(target=send_resend_otp_email, args=(user.email, new_otp)).start()
+
+
             return JsonResponse({"message": "Nouveau OTP envoyé avec succès."}, status=200)
 
         except Exception as e:
