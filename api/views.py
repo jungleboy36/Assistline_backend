@@ -216,6 +216,7 @@ def login(request):
             request.session['email'] = user.email
             request.session['verified'] = user.emailVerified
             request.session['role'] = user.role
+            request.session['enabled'] = user.enabled
 
             return JsonResponse({
                 "message": "Connexion réussie",
@@ -239,7 +240,7 @@ def logout(request):
 
 def check_session(request):
     if 'user_id' in request.session:
-        return JsonResponse({"message": "User is logged in", "user_id": request.session['user_id'],"role":request.session['role']}, status=200)
+        return JsonResponse({"message": "User is logged in","session":request.session}, status=200)
     else:
         return JsonResponse({"message": "User is not logged in"}, status=401)
 
