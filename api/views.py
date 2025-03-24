@@ -69,6 +69,7 @@ def register(request):
             data = request.POST
             if User.objects.filter(email=data['email']).exists():
                 return JsonResponse({"error": "Email already exists"}, status=400)
+            file = request.FILES.get('file')
             otp = generate_otp()
             # Create new user
             user = User(
@@ -76,7 +77,7 @@ def register(request):
                 city=data.get('city', ''),
                 date_inscription=timezone.now(),
                 email=data['email'],
-                file=data.get('file', ''),
+                file=file,
                 name=data.get('name', ''),
                 phone=data.get('phone', ''),
                 role="user",

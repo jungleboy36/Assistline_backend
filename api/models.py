@@ -10,7 +10,7 @@ class User(models.Model):
     city = models.CharField(max_length=255, null=True, blank=True)
     date_inscription = models.DateField(null=True, blank=True, db_column='dateInscription')
     email = models.EmailField(unique=True, max_length=255)
-    file = models.TextField(null=True, blank=True,db_column='file')
+    file = models.FileField(upload_to='uploads/', null=True, blank=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     phone = models.CharField(max_length=255, null=True, blank=True)
     role = models.CharField(max_length=255, null=True, blank=True)
