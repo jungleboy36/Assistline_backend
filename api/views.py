@@ -91,13 +91,13 @@ def register(request):
                   # Hash the password
             )
             user.save()
-            send_mail(
-                "Code de vérification",
-                f"Votre code de vérification est : {otp}. Il expirera dans 5 minutes.",
-                settings.EMAIL_HOST_USER,
-                [user.email],
-                fail_silently=False,
-            )
+            #send_mail(
+                #"Code de vérification",
+                #f"Votre code de vérification est : {otp}. Il expirera dans 5 minutes.",
+                #settings.EMAIL_HOST_USER,
+                #[user.email],
+                #fail_silently=True,
+            #) 
             return JsonResponse({"message": "User registered successfully"}, status=201)
 
         except Exception as e:
