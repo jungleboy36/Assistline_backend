@@ -245,7 +245,7 @@ def check_session(request):
             "user_id": request.session.get("user_id"),
             "email": request.session.get("email"),
             "role": request.session.get("role"),
-            "verified": request.session.get("is_verified"),
+            "verified": request.session.get("verified"),
             "enabled": request.session.get("enabled", True)  # optional fallback
         }, status=200)
     else:
