@@ -7,10 +7,18 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'bio', 'city', 'date_inscription', 'email', 'file', 'name', 'phone', 'role', 'type_user', 'statut_user', 'password', 'otp', 'otp_created_at', 'enabled', 'emailVerified']
         extra_kwargs = {'password': {'write_only': True}}
-    
+        file = serializers.SerializerMethodField()
+
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])
         return super().create(validated_data)
+        
+    def get_file(self, obj):
+        request = self.context.get('request')
+        if obj.file:
+            return request.build_absolute_uri(obj.file.url)
+        return None
+
 
 class OffreSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)  # Only returns the user ID

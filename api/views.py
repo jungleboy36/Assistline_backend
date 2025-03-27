@@ -555,23 +555,10 @@ class ProfileView(APIView):
 
 class AdminCompaniesViewSet(viewsets.ViewSet):
     def list(self, request):
-        # Get all verified users with role = 'company'
-        companies = User.objects.filter(role='user', emailVerified=1)  # Assuming 'statut_user' means verified
+        companies = User.objects.filter(role='user', emailVerified=True)
+        serializer = UserSerializer(companies, many=True, context={'request': request})
+        return Response(serializer.data)
 
-        company_list = []
-        for company in companies:
-            company_data = {
-                'id': company.id,
-                'name': company.name,
-                'email': company.email,
-                'enabled': bool(company.enabled),
-                'dateInscription': company.date_inscription,
-
-                'file': company.file,
-            }
-            company_list.append(company_data)
-
-        return Response(company_list, status=status.HTTP_200_OK)
 
     def update(self, request, pk=None):
         enabled = request.data.get('enabled')
@@ -677,9 +664,6 @@ class AdminClientsViewSet(viewsets.ViewSet):
         username = user["name"]
         if enabled :
             send_email(user['email'],f'Bonjour {username}, nous vous informons que votre compte a été activé.')
-
-        else :
-            send_email(user['email'],f'Bonjour {username}, nous vous informons que votre compte a été désactivé.')
 
         # Return a successful response
         return Response({'message': 'User account updated successfully'}, status=status.HTTP_200_OK)
