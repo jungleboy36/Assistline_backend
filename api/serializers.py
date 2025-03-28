@@ -12,11 +12,11 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])
         return super().create(validated_data)
-        
+
     def get_file(self, obj):
         request = self.context.get('request')
         if obj.file:
-            return request.build_absolute_uri(obj.file.url)
+            url = request.build_absolute_uri(file.url).replace('http://', 'https://')
         return None
 
 
