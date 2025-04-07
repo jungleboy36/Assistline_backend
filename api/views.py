@@ -149,7 +149,7 @@ def verify_otp(request):
                 threading.Thread(target=send_success_verification_email, args=(user.email,)).start()
 
                 return JsonResponse({"message": "OTP verified successfully"}, status=200)
-            elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=1):
+            elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=5):
                 return JsonResponse({"message": "expired"}, status=400)
             else:
                 return JsonResponse({"message": "invalid"}, status=400) 
