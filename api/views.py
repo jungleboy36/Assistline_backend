@@ -284,6 +284,12 @@ def email_exists(request,email):
     exists = User.objects.filter(email=email).exists()
     return JsonResponse({"exists": exists}, status=200)
 
+class OffreTypeList(APIView):
+    def get(self, request):
+        offre_types = Parameter.objects.all()
+        serializer = ParameterSerializer(offre_types, many=True)
+        return Response(serializer.data)
+
 class OffresViewSet(viewsets.ModelViewSet):
     queryset = Offre.objects.all()
     serializer_class = OffreSerializer

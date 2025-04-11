@@ -52,11 +52,30 @@ class Offre(models.Model):
     destination_date_end = models.DateField(null=True, blank=True,db_column='destinationDateEnd')
     prix = models.IntegerField()
     volume = models.IntegerField()
+    reference = models.TextField(null=True, blank=True)
+    type_offre = models.ForeignKey(
+        'Parameter', 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='offres',
+        db_column='type_offre'
+    )
     class Meta:
         db_table = 'offres'
     def __str__(self):
-        return self.title
+        return f"Offre #{self.id_offre}"
 	  
+class Parameter(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'parameters'
+        managed = False
+
+    def __str__(self):
+        return self.name
 
 class Demande(models.Model):
 	id = models.IntegerField(primary_key=True)

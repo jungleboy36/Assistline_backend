@@ -57,6 +57,7 @@ urlpatterns = [
     path("login/", login, name="login"),
 	path('get-user/', get_user_info, name='get_user_info'),
 	path('canResend/<str:email>', canResend, name='canResend'),
+    path('offre-types/', OffreTypeList.as_view(), name='offre-types'),
 
 
 
