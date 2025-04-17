@@ -69,10 +69,15 @@ def send_verification_email(email, otp):
         fail_silently=False,
     )
 
-def send_success_verification_email(email):
+def send_success_verification_email(email,role):
+    if role == 'particulier':
+        message = "Votre compte a été vérifié avec succès. Vous pouvez maintenant vous connecter à notre plateforme."
+    elif role == 'professionnel':
+        message = "Votre email a été vérifié avec succès. Veuillez patienter pendant que nous vérifions vos documents afin que vous puissiez vous connecter à notre plateforme.",
+
     send_mail(
         "Email vérifié",
-        "Votre email a été vérifié avec succès. Veuillez patienter pendant que nous vérifions vos documents afin que vous puissiez vous connecter à notre plateforme.",
+         message,     
         settings.EMAIL_HOST_USER,
         [email],
         fail_silently=False,
@@ -94,28 +99,37 @@ def register(request):
             data = request.POST
             if User.objects.filter(email=data['email']).exists():
                 return JsonResponse({"error": "Email already exists"}, status=400)
+
             file = request.FILES.get('file')
             otp = generate_otp()
+
             # Create new user
             user = User(
+                civility=data.get('civility', ''),
+                first_name=data.get('first_name', ''),
+                last_name=data.get('last_name', ''),
+                raison_sociale=data.get('raison_sociale', ''),
+                siret=data.get('siret', ''),
+                contact_name=data.get('contact_name', ''),
                 bio=data.get('bio', ''),
                 city=data.get('city', ''),
                 date_inscription=timezone.now(),
                 email=data['email'],
                 file=file,
-                name=data.get('name', ''),
                 phone=data.get('phone', ''),
-                role="user",
-                type_user=data.get('type_user', None),
-                statut_user=data.get('statut_user', None),
+                role=data.get('role', ''),
+                type_user=data.get('type_user') or None,
+                statut_user=data.get('statut_user') or None,
                 password=make_password(data['password']),
                 otp=otp,
                 otp_created_at=timezone.now(),
-                enabled=0,
-                emailVerified=0,
-                  # Hash the password
+                enabled=False,
+                emailVerified=False,
             )
+
             user.save()
+
+            # Send email in background thread
             threading.Thread(target=send_verification_email, args=(user.email, otp)).start()
 
             return JsonResponse({"message": "User registered successfully"}, status=201)
@@ -145,8 +159,12 @@ def verify_otp(request):
                 user.emailVerified=1 # Mark user as verified
                 user.otp = None  # Remove OTP after verification
                 user.otp_created_at = None
+                if user.role == 'professionnel':
+                    user.enabled = 0
+                else:
+                    user.enabled = 1
                 user.save()
-                threading.Thread(target=send_success_verification_email, args=(user.email,)).start()
+                threading.Thread(target=send_success_verification_email, args=(user.email,user.role)).start()
 
                 return JsonResponse({"message": "OTP verified successfully"}, status=200)
             elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=5):
@@ -228,13 +246,16 @@ def login(request):
             request.session['verified'] = user.emailVerified
             request.session['role'] = user.role
             request.session['enabled'] = user.enabled
-
+            if user.role == 'professionnel':
+                name = user.contact_name
+            else:
+                name = user.first_name
             return JsonResponse({
                 "message": "Connexion réussie",
                 "user": {
                     "id": user.id,
                     "email": user.email,
-                    "name": user.name,
+                    "name": name,
                     "verified": user.emailVerified,
                     "role": user.role,
                     'enabled': user.enabled
@@ -269,10 +290,14 @@ def get_user_info(request):
 
     try:
         user = User.objects.get(id=user_id)
+        if user.role == 'professionnel':
+            name = user.contact_name
+        else:
+            name = user.first_name
         return JsonResponse({
             "id": user.id,
             "email": user.email,
-            "name": user.name,
+            "name": name,
             "role": user.role,
         }, status=200)
 
@@ -561,7 +586,7 @@ class ProfileView(APIView):
 
 class AdminCompaniesViewSet(viewsets.ViewSet):
     def list(self, request):
-        companies = User.objects.filter(role='user', emailVerified=True)
+        companies = User.objects.filter(role='professionnel', emailVerified=True)
         serializer = UserSerializer(companies, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -572,7 +597,7 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
             return Response({'error': 'Missing "enabled" parameter'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(id=pk, role='user')
+            user = User.objects.get(id=pk, role='professionnel')
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -580,9 +605,9 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
         user.save()
 
         message = (
-            f"Bonjour {user.name},\nVotre compte est maintenant actif et vous pouvez vous connecter à notre plateforme."
+            f"Bonjour {user.contact_name},\nVotre compte est maintenant actif et vous pouvez vous connecter à notre plateforme."
             if enabled else
-            f"Bonjour {user.name},\nnous vous informons que votre compte a été désactivé."
+            f"Bonjour {user.contact_name},\nnous vous informons que votre compte a été désactivé."
         )
         send_mail(
             subject='Compte activé' if enabled else 'Compte désactivé',
@@ -598,13 +623,13 @@ class AdminCompaniesViewSet(viewsets.ViewSet):
     @requires_role(['admin'])
     def retrieve(self, request, pk=None):
         try:
-            user = User.objects.get(pk=pk, role='company')
+            user = User.objects.get(pk=pk, role='professionnel')
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
         user_data = {
             'id': user.id,
-            'name': user.name,
+            'name': user.contact_name,
             'email': user.email,
             'enabled': bool(user.statut_user),
             'city': user.city,

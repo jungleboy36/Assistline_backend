@@ -2,21 +2,25 @@ from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
 
-
-
 class User(models.Model):
     id = models.AutoField(primary_key=True)
+    civility = models.CharField(max_length=50, null=True, blank=True)
+    first_name = models.CharField(max_length=255, null=True, blank=True)
+    last_name = models.CharField(max_length=255, null=True, blank=True)
+    raison_sociale = models.CharField(max_length=255, null=True, blank=True)
+    siret = models.CharField(max_length=20, null=True, blank=True)
+    contact_name = models.CharField(max_length=255, null=True, blank=True)
+
     bio = models.TextField(null=True, blank=True)
     city = models.CharField(max_length=255, null=True, blank=True)
     date_inscription = models.DateField(null=True, blank=True, db_column='dateInscription')
     email = models.EmailField(unique=True, max_length=255)
     file = models.FileField(upload_to='uploads/', null=True, blank=True)
-    name = models.CharField(max_length=255, null=True, blank=True)
     phone = models.CharField(max_length=255, null=True, blank=True)
     role = models.CharField(max_length=255, null=True, blank=True)
     type_user = models.IntegerField(null=True, blank=True)
     statut_user = models.IntegerField(null=True, blank=True)
-    password = models.CharField(max_length=255)  # Store hashed passwords
+    password = models.CharField(max_length=255)
     otp = models.CharField(max_length=6, null=True, blank=True)
     otp_created_at = models.DateTimeField(null=True, blank=True)
     enabled = models.BooleanField(null=True, blank=True)

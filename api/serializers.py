@@ -5,7 +5,13 @@ from rest_framework import serializers
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'bio', 'city', 'date_inscription', 'email', 'file', 'name', 'phone', 'role', 'type_user', 'statut_user', 'password', 'otp', 'otp_created_at', 'enabled', 'emailVerified']
+        fields = [
+                    'id', 'civility', 'first_name', 'last_name',
+                    'raison_sociale', 'siret', 'contact_name',
+                    'bio', 'city', 'date_inscription', 'email', 'file', 'phone',
+                    'role', 'type_user', 'statut_user', 'password',
+                    'otp', 'otp_created_at', 'enabled', 'emailVerified'
+                ]        
         extra_kwargs = {'password': {'write_only': True}}
         file = serializers.SerializerMethodField()
 
