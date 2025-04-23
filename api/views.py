@@ -140,40 +140,43 @@ def register(request):
 @csrf_exempt
 @api_view(['POST'])
 def verify_otp(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            print(data)
-            email = data.get("email")
-            otp = data.get("otp")
+    # DRF will parse JSON for us
+    data = request.data
 
-            user = User.objects.filter(email=email).first()
+    email = data.get("email")
+    otp   = data.get("otp")
+    if not email or not otp:
+        return JsonResponse({"error": "Both email and otp are required"}, status=400)
 
-            if not user:
-                return JsonResponse({"error": "User not found"}, status=400)
-            if user.emailVerified:
-                return JsonResponse({"error": "User already verified"}, status=400)
-            # Check if OTP is valid and not expired (valid for 5 minutes)
-            if user.otp == otp and user.otp_created_at and now() - user.otp_created_at < timedelta(minutes=5):
-                user.is_verified = True 
-                user.emailVerified=1 # Mark user as verified
-                user.otp = None  # Remove OTP after verification
-                user.otp_created_at = None
-                if user.role == 'professionnel':
-                    user.enabled = 0
-                else:
-                    user.enabled = 1
-                user.save()
-                threading.Thread(target=send_success_verification_email, args=(user.email,user.role)).start()
+    user = User.objects.filter(email=email).first()
+    if not user:
+        return JsonResponse({"error": "User not found"}, status=404)
+    if user.emailVerified:
+        return JsonResponse({"error": "User already verified"}, status=400)
 
-                return JsonResponse({"message": "OTP verified successfully"}, status=200)
-            elif user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=5):
-                return JsonResponse({"message": "expired"}, status=400)
-            else:
-                return JsonResponse({"message": "invalid"}, status=400) 
+    # Valid for 5 minutes
+    if user.otp == otp and user.otp_created_at and now() - user.otp_created_at < timedelta(minutes=5):
+        user.emailVerified = True
+        user.otp = None
+        user.otp_created_at = None
+        user.enabled = (0 if user.role == 'professionnel' else 1)
+        user.save()
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
+        # Send notification email asynchronously
+        threading.Thread(
+            target=send_success_verification_email,
+            args=(user.email, user.role),
+            daemon=True
+        ).start()
+
+        return JsonResponse({"message": "OTP verified successfully"}, status=200)
+
+    # Expired
+    if user.otp_created_at and now() - user.otp_created_at > timedelta(minutes=5):
+        return JsonResponse({"message": "expired"}, status=400)
+
+    # Invalid
+    return JsonResponse({"message": "invalid"}, status=400)
 
 
 @csrf_exempt
