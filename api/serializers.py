@@ -31,8 +31,45 @@ class OffreSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source='user', write_only=True)  
     class Meta:
         model = Offre
-        fields = ['id_offre', 'destination_date_start', 'creation_date', 'depart_date_start', 'destination', 'origin', 'route', 'update_date', 'user','user_id', 'depart_date_end', 'destination_date_end', 'prix', 'volume','reference','type_offre']
- 
+        fields = [
+            'id_offre',
+            'destination_date_start',
+            'creation_date',
+            'depart_date_start',
+            'depart_date_end',
+            'destination_date_end',
+            'destination',
+            'origin',
+            'route',
+            'update_date',
+            'prix',
+            'volume',
+            'reference',
+            'type_offre',
+
+            # New Passage / Equipment Booleans
+            'ascenseur_depart',
+            'ascenseur_arrivee',
+            'monte_meuble_depart',
+            'monte_meuble_arrivee',
+            'escalier_depart',
+            'escalier_arrivee',
+            'direct_depart',
+            'direct_arrivee',
+
+            # Etage & Prescriptions
+            'depart_etage',
+            'arrivee_etage',
+            'depart_pres',
+            'arrivee_pres',
+
+            # Commentaire
+            'commentaire',
+
+            # User relation
+            'user',
+            'user_id',
+        ] 
 class DemandesSerializer(serializers.HyperlinkedModelSerializer):
     # specify model and fields
     class Meta:

@@ -57,6 +57,19 @@ class Offre(models.Model):
     prix = models.IntegerField()
     volume = models.IntegerField()
     reference = models.TextField(null=True, blank=True)
+    ascenseur_depart=models.BooleanField(null=True, blank=True,db_column='ascenseur_depart')
+    ascenseur_arrivee=models.BooleanField(null=True, blank=True,db_column='ascenseur_arrivee')
+    monte_meuble_depart=models.BooleanField(null=True, blank=True,db_column='monte_meuble_depart')
+    monte_meuble_arrivee=models.BooleanField(null=True, blank=True,db_column='monte_meuble_arrivee')
+    escalier_depart=models.BooleanField(null=True, blank=True,db_column='escalier_depart')
+    escalier_arrivee=models.BooleanField(null=True, blank=True,db_column='escalier_arrivee')
+    direct_depart=models.BooleanField(null=True, blank=True,db_column='direct_depart')
+    direct_arrivee=models.BooleanField(null=True, blank=True,db_column='direct_arrivee')
+    depart_etage=models.TextField(null=True, blank=True,db_column='depart_etage')
+    arrivee_etage=models.TextField(null=True, blank=True,db_column='arrivee_etage')
+    depart_pres=models.TextField(null=True, blank=True,db_column='depart_pres')
+    arrivee_pres=models.TextField(null=True, blank=True,db_column='arrivee_pres')
+    commentaire=models.TextField(null=True, blank=True,db_column='commentaire')
     type_offre = models.ForeignKey(
         'Parameter', 
         on_delete=models.SET_NULL,
