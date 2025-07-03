@@ -14,7 +14,9 @@ router.register(r'offres', OffresViewSet, basename='offres')
 router.register(r'demandes', DemandesViewSet, basename='demandes')
 router.register(r'reset-password', PasswordResetViewSet, basename='reset-password')
 router.register(r'companies', AdminCompaniesViewSet, basename='admin_companies'),
-router.register(r'clients', AdminClientsViewSet, basename='admin_clients')
+router.register(r'clients', AdminClientsViewSet, basename='admin_clients'),
+router.register(r'retour-vide', RetourVideViewSet, basename='retour-vide'),
+router.register(r'propositions', PropositionViewSet, basename='propositions')
 
 
 
@@ -58,7 +60,6 @@ urlpatterns = [
 	path('get-user/', get_user_info, name='get_user_info'),
 	path('canResend/<str:email>', canResend, name='canResend'),
     path('offre-types/', OffreTypeList.as_view(), name='offre-types'),
-
 
 
 

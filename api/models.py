@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
-
+from django.conf import settings
 
 class User(models.Model):
     id = models.AutoField(primary_key=True)
@@ -25,6 +25,8 @@ class User(models.Model):
     otp_created_at = models.DateTimeField(null=True, blank=True)
     enabled = models.BooleanField(null=True, blank=True)
     emailVerified = models.BooleanField(null=True, blank=True)
+    last_login    = models.DateTimeField(null=True, blank=True)
+    date_joined   = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
         db_table = 'users'
@@ -123,3 +125,92 @@ class Notification(models.Model):
     class Meta:
         ordering = ['-timestamp']
 
+
+
+class RetourVide(models.Model):
+    TYPE_CAMION_CHOICES = [
+        ('VL', 'VL'),
+        ('PL', 'PL'),
+    ]
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='retour_vide')
+    volume = models.DecimalField(max_digits=10, decimal_places=2)
+    type_camion = models.CharField(max_length=2, choices=TYPE_CAMION_CHOICES)
+    avec_hayon = models.BooleanField()
+    depart_date_start  = models.DateField()
+    depart_date_end    = models.DateField(null=True, blank=True)
+    arrival_date_start = models.DateField()
+    arrival_date_end   = models.DateField(null=True, blank=True)
+    detour_possible    = models.BooleanField()
+    origin = models.CharField(max_length=2, blank=True, null=True)
+    destination   = models.CharField(max_length=2, blank=True, null=True)
+    itineraire = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'retour vide #{self.id} by {self.user}'
+    class Meta:
+        db_table = 'retour_vide'
+        managed = False
+
+
+
+class Proposition(models.Model):
+    """
+    Modèle pour les propositions faites à un retour vide.
+    """
+    STATUS_CHOICES = [
+        ('EN_COURS', 'En cours'),
+        ('REFUSEE',  'Refusée'),
+        ('CLOTUREE', 'Clôturée'),
+    ]
+    PASSAGE_CHOICES = [
+        ('ASC', 'Ascenseur'),
+        ('ESC', 'Escalier'),
+    ]
+
+    # Référence au retour vide
+    retour = models.ForeignKey(RetourVide, on_delete=models.CASCADE, )
+
+    # Si c’est un PRO connecté, on stocke user_pro. Sinon user_pro = None et on remplit les champs “Particulier” suivants.
+    user_pro = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Champs “Particulier” (obligatoires si user_pro=None)
+    civility   = models.CharField(max_length=20, null=True, blank=True)  # ex. “Mr”, “Mme”
+    first_name = models.CharField(max_length=255, null=True, blank=True)
+    last_name  = models.CharField(max_length=255, null=True, blank=True)
+    email      = models.EmailField(max_length=255, null=True, blank=True)
+    phone      = models.CharField(max_length=50, null=True, blank=True)
+
+    # Données de la proposition
+    volume_propose = models.DecimalField(max_digits=10, decimal_places=2)
+    biens           = models.TextField(help_text="Liste des biens à transporter (texte libre)")
+
+    periode_souhaitee_start = models.DateField()
+    periode_souhaitee_end   = models.DateField()
+    flexibilite    = models.BooleanField(default=False)
+
+    # Détails de chargement
+    adresse_chargement = models.CharField(max_length=255)
+    etage_chargement   = models.IntegerField()
+    passage_chargement = models.CharField(max_length=10, choices=PASSAGE_CHOICES)
+
+    # Détails de livraison
+    adresse_livraison  = models.CharField(max_length=255)
+    etage_livraison    = models.IntegerField()
+    passage_livraison  = models.CharField(max_length=10, choices=PASSAGE_CHOICES)
+
+    statut            = models.CharField(max_length=10, choices=STATUS_CHOICES, default='EN_COURS')
+    code_confidentiel = models.CharField(max_length=10, null=True, blank=True)
+
+    created_at        = models.DateTimeField(auto_now_add=True)
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Proposition #{self.id} pour Retour #{self.retour_id}"
+    
+    class Meta:
+        db_table = 'proposition'
+        managed = False
+        ordering = ['-created_at']

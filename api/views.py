@@ -34,7 +34,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now,timedelta
 import threading
-
+from rest_framework import viewsets, status
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
 def generate_otp():
     return str(random.randint(100000, 999999))  # Generates a 6-digit OTP
 
@@ -349,6 +351,131 @@ class OffresViewSet(viewsets.ModelViewSet):
         offre = self.get_object()
         offre.delete()
         return Response({'message': 'Offre deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+class RetourVideViewSet(viewsets.ModelViewSet):
+    queryset = RetourVide.objects.all()
+    serializer_class = RetourVideSerializer
+    # permission_classes = [IsAuthenticated]   # enable once you wire up real auth
+
+    def get_queryset(self):
+        user_id = self.request.session.get('user_id')
+        if not user_id:
+            return RetourVide.objects.none()
+        return RetourVide.objects.filter(user_id=user_id)
+
+    def perform_create(self, serializer):
+        user_id = self.request.session.get('user_id')
+        if not user_id:
+            raise Response({'error': 'Utilisateur non authentifié.'}, status=status.HTTP_401_UNAUTHORIZED)
+        user = User.objects.get(pk=user_id)
+        serializer.save(user=user)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user_id = request.session.get('user_id')
+        if instance.user_id != user_id:
+            return Response({'error': 'Accès refusé.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user_id = request.session.get('user_id')
+        if instance.user_id != user_id:
+            return Response({'error': 'Accès refusé.'}, status=status.HTTP_403_FORBIDDEN)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+class PropositionViewSet(viewsets.ModelViewSet):
+    """
+    CRUD complet pour les propositions.
+    - create() : Particulier (AllowAny) ou PRO connecté (IsAuthenticated).
+    - list/retrieve : on peut filtrer par ?retour=ID.
+    - update() : uniquement pour changer le statut (REFUSEE/CLOTUREE) OU édition par PRO.
+    - destroy(): suppression (optionnel).
+    - actions custom : accepter/refuser/executer.
+    """
+    queryset = Proposition.objects.all()
+    serializer_class = PropositionSerializer
+
+    def get_permissions(self):
+        # Anyone can create (AllowAny). Pour liste et retrieve, on autorise tous (vous pouvez restreindre plus tard).
+        if self.action in ['create']:
+            return [AllowAny()]
+        return [AllowAny()]
+
+    def get_queryset(self):
+        """
+        Si on passe ?retour=ID dans la querystring, on ne retourne que
+        les propositions liées à ce retour précis.
+        """
+        qs = super().get_queryset()
+        retour_id = self.request.query_params.get('retour')
+        if retour_id is not None:
+            qs = qs.filter(retour_id=retour_id)
+        return qs
+
+    def perform_create(self, serializer):
+        """
+        Si PRO connecté (request.user.role == 'professionnel'), on met user_pro = request.user.
+        Sinon, on laisse user_pro=None et on s'appuie sur les champs Particulier (civility,...).
+        """
+        user = self.request.user
+        if user.is_authenticated and getattr(user, 'role', '') == 'professionnel':
+            # On force user_pro sur request.user
+            serializer.save(user_pro=user)
+        else:
+            # Particulier (anonymous ou non-PRO) : user_pro reste None, on sauvegarde les champs civility, ...
+            serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='changer-statut')
+    def changer_statut(self, request, pk=None):
+        """
+        Permet au PRO de refuser ou clôturer la proposition.
+        JSON attendu: { "statut": "REFUSEE" } ou { "statut": "CLOTUREE" }
+        """
+        prop = self.get_object()
+        # Vérifier que c'est bien le PRO propriétaire du retour
+        if not request.user.is_authenticated or prop.retour.user_id != request.user.id:
+            return Response({'detail':'Accès refusé.'}, status=status.HTTP_403_FORBIDDEN)
+
+        new_statut = request.data.get('statut')
+        if new_statut not in ['REFUSEE','CLOTUREE']:
+            return Response({'detail':'Statut invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+        prop.statut = new_statut
+        prop.save()
+        return Response({'id': prop.id, 'statut': prop.statut})
+
+    @action(detail=True, methods=['post'], url_path='executer')
+    def executer(self, request, pk=None):
+        """
+        Une fois queue la proposition est 'CLOTUREE', le PRO clique sur Executer :
+        - Génère un code confidentiel à envoyer au client.
+        - Change le champ code_confidentiel et renvoie ce code en JSON.
+        """
+        prop = self.get_object()
+        if not request.user.is_authenticated or prop.retour.user_id != request.user.id:
+            return Response({'detail':'Accès refusé.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if prop.statut != 'CLOTUREE':
+            return Response({'detail':'La proposition doit être "CLOTUREE" avant d’exécuter.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        import random
+        code = f"{random.randint(100000, 999999)}"
+        prop.code_confidentiel = code
+        prop.save()
+        # TODO: envoyer un mail au client avec ce code
+        return Response({'code_confidentiel': code})
+
+
+
 
 class DemandesViewSet(viewsets.ViewSet):
     serializer_class = DemandesSerializer
