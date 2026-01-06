@@ -1,4 +1,4 @@
-🚀 Assistline Backend
+**🚀 Assistline Backend**
 
 Django REST API backend powering Assistline with authentication, Firebase, PayPal, real-time chat, and geolocation.
 
